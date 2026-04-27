@@ -1,0 +1,21 @@
+# Build
+*.apk
+*.aab
+*.ap_
+build/
+app/build/
+dist/
+
+# Keystore — NUNCA commitear
+*.jks
+*.keystore
+keystore.properties
+
+# Gradle
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
