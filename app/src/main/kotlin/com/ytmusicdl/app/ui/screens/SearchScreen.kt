@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,18 +43,20 @@ fun SearchScreen(
                 if (q.isNotBlank()) {
                     isLoading = true
                     errorMsg  = null
-                    kotlinx.coroutines.GlobalScope.launch {
-                        try {
-                            results = if (searchType == "album")
-                                repository.searchAlbums(q)
-                            else
-                                repository.searchSongs(q)
-                        } catch (e: Exception) {
-                            errorMsg = "Error: ${e.message}"
-                        } finally {
-                            isLoading = false
-                        }
-                    }
+                    scope.launch {
+    try {
+        val data = if (searchType == "album")
+            repository.searchAlbums(q)
+        else
+            repository.searchSongs(q)
+
+        results = data
+    } catch (e: Exception) {
+        errorMsg = "Error: ${e.message}"
+    } finally {
+        isLoading = false
+    }
+}
                 }
             },
             active           = false,
@@ -79,9 +82,9 @@ fun SearchScreen(
                 selected = searchType == "song",
                 onClick  = { searchType = "song" },
                 label    = { Text("Canciones") },
-                leadingIcon = if (searchType == "song") {{
-                    Icon(Icons.Default.Check, null, Modifier.size(16.dp))
-                }} else null,
+                leadingIcon = if (searchType == "song") {
+                { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+               } else null,
             )
             FilterChip(
                 selected = searchType == "album",
