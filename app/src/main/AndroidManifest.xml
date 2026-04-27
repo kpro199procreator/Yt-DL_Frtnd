@@ -8,7 +8,6 @@
 
     <application
         android:label="ytmusicdl"
-        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
         android:allowBackup="true">
 
         <activity
