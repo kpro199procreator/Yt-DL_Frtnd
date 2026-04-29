@@ -1,63 +1,35 @@
-# ytmusicdl — App Android
+# ytmusicdl — standalone
 
-Frontend Material 3 para [ytmusicdl](https://github.com/tu-usuario/ytmusic-dl).
-Se comunica con ytmusicdl corriendo en Termux vía HTTP local.
+App Android completamente independiente para descargar música de YouTube Music.
+**Sin Termux. Sin Python. Sin configuración.**
 
-## Requisitos
+## Stack
 
-- Termux instalado (desde F-Droid)
-- ytmusicdl instalado en Termux
-- `allow-external-apps = true` en `~/.termux/termux.properties`
+| Componente | Librería |
+|---|---|
+| Búsqueda + extracción de streams | NewPipe Extractor v0.24.2 |
+| Conversión de audio | ffmpeg-kit-fork (audio) |
+| Tags ID3/MP4 | JAudioTagger 3.0.1 |
+| Letras sincronizadas LRC | lrclib.net API (gratis, sin key) |
+| UI | Jetpack Compose + Material 3 |
+| Caché | Room (SQLite) |
 
 ## Compilar
 
 ```bash
-# Debug (sin keystore)
 ./gradlew assembleDebug
-
 # APK en: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Release automático con GitHub Actions
+## Publicar con GitHub Actions
 
-Crear un tag para disparar el workflow:
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.1.0-alpha
+git push origin v0.1.0-alpha
+# → Actions compila y publica en GitHub Releases
 ```
 
-El APK aparece en GitHub Releases automáticamente.
+## Nota sobre ffmpeg-kit
 
-## Configurar firma (opcional, para releases firmados)
-
-### 1. Generar keystore
-```bash
-keytool -genkey -v \
-  -keystore ytmusicdl.jks \
-  -keyalg RSA -keysize 2048 \
-  -validity 10000 \
-  -alias ytmusicdl
-```
-
-### 2. Convertir a base64
-```bash
-base64 ytmusicdl.jks | tr -d '\n'
-```
-
-### 3. Agregar secrets en GitHub
-```
-Settings → Secrets → Actions → New secret:
-
-KEYSTORE_BASE64        → base64 del .jks
-SIGNING_KEY_ALIAS      → ytmusicdl
-SIGNING_KEY_PASSWORD   → tu contraseña de key
-SIGNING_STORE_PASSWORD → tu contraseña del keystore
-```
-
-### 4. Para desarrollo local
-Crear `keystore.properties` en la raíz (está en .gitignore):
-```
-storePassword=tu_contraseña
-keyAlias=ytmusicdl
-keyPassword=tu_contraseña
-```
+El ffmpeg-kit original fue archivado en abril 2025.
+Este proyecto usa el fork de la comunidad `pgahq/ffmpeg-kit-fork`.
