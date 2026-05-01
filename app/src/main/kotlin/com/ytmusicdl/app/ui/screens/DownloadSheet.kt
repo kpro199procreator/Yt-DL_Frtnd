@@ -3,6 +3,7 @@ package com.ytmusicdl.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
+import com.ytmusicdl.app.data.model.AudioFormatOption
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
@@ -31,6 +33,30 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
     val state by DownloadService.downloadState.collectAsState()
     val scope = rememberCoroutineScope()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var showFormatSelector by remember { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var formatsError by remember { mutableStateOf<String?>(null) }
+    var audioFormats by remember { mutableStateOf<List<AudioFormatOption>>(emptyList()) }
+
+    LaunchedEffect(state, track.videoId) {
+        val error = (state as? DownloadState.Error)?.message.orEmpty()
+        val hasUnavailableFormatError = error.contains("Requested format is not available", ignoreCase = true) ||
+            error.contains("format is not available", ignoreCase = true)
+        if (!hasUnavailableFormatError || isLoadingFormats || showFormatSelector) return@LaunchedEffect
+
+        isLoadingFormats = true
+        showFormatSelector = true
+        formatsError = null
+        audioFormats = emptyList()
+        runCatching {
+            ExtractorBackendProvider.backend.listAudioFormats(track.videoId)
+        }.onSuccess { formats ->
+            audioFormats = formats
+        }.onFailure { throwable ->
+            formatsError = throwable.message ?: "No se pudieron listar formatos"
+        }
+        isLoadingFormats = false
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -86,5 +112,52 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showFormatSelector) {
+        AlertDialog(
+            onDismissRequest = { showFormatSelector = false },
+            title = { Text("Formato no disponible") },
+            text = {
+                when {
+                    isLoadingFormats -> Text("Cargando formatos disponibles…")
+                    formatsError != null -> Text("Fallo al listar formatos: ${formatsError}")
+                    audioFormats.isEmpty() -> Text("No hay formatos alternativos para esta pista.")
+                    else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                        items(audioFormats, key = { it.formatId }) { format ->
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        "${format.formatId} • ${format.ext} • ${format.abr} kbps • ${
+                                            format.note.ifBlank { "sin nota" }
+                                        }"
+                                    )
+                                },
+                                supportingContent = {
+                                    Text("${format.acodec} • ${format.protocol}")
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showFormatSelector = false
+                                        DownloadService.downloadState.value = DownloadState.FetchingStream
+                                        DownloadService.start(context, track, format.formatId)
+                                    },
+                                tonalElevation = 0.dp
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFormatSelector = false }) { Text("Cerrar") }
+            },
+            dismissButton = {
+                if (audioFormats.isNotEmpty() && !isLoadingFormats && formatsError == null) {
+                    TextButton(onClick = { showFormatSelector = false }) { Text("Cancelar") }
+                }
+            }
+        )
     }
 }
