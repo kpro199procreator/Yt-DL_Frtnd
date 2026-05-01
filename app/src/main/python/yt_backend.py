@@ -100,8 +100,11 @@ def list_audio_formats(video_id):
             with redirect_stdout(out):
                 ydl.list_formats(info)
             list_formats_output = out.getvalue()
-    except DownloadError:
-        return json.dumps([])
+    except DownloadError as e:
+        return json.dumps({
+            "raw_output": f"ERROR: {str(e)}",
+            "audio_formats": [],
+        })
 
     formats = info.get("formats") or []
     note_by_id = {}
@@ -130,7 +133,11 @@ def list_audio_formats(video_id):
             "asr": int(fmt.get("asr") or 0),
             "note": note_by_id.get(fmt_id) or fmt.get("format_note", "") or fmt.get("format", ""),
         })
-    return json.dumps(audio_formats)
+
+    return json.dumps({
+        "raw_output": list_formats_output,
+        "audio_formats": audio_formats,
+    })
 
 
 def get_music_metadata(video_id_or_query):

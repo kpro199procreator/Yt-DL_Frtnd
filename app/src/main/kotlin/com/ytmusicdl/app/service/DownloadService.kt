@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Servicio de descarga en foreground.
  * Flujo:
- *   1. NewPipe extrae la URL de audio del video
+ *   1. yt-dlp/Python backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
  *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
@@ -93,7 +93,7 @@ class DownloadService : Service() {
 
     private suspend fun downloadTrack(track: Track, preferredFormatId: String? = null) {
         try {
-            // 1. Extraer URL de audio con NewPipe
+            // 1. Extraer URL de audio con yt-dlp/Python backend
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 
