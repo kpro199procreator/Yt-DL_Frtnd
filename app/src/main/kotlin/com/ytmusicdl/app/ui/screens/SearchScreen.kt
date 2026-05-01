@@ -15,7 +15,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.ytmusicdl.app.data.api.NewPipeService
+import com.ytmusicdl.app.data.api.ExtractorProvider
 import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.launch
 
@@ -38,7 +38,7 @@ fun SearchScreen(onDownload: (Track) -> Unit) {
                     loading = true; error = null
                     scope.launch {
                         try {
-                            results = NewPipeService.searchSongs(q)
+                            results = ExtractorProvider.backend.searchSongs(q)
                         } catch (e: Exception) {
                             error = e.message
                         } finally {

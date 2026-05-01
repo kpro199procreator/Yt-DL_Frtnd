@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.ytmusicdl.app.data.api.NewPipeService
+import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.ui.screens.DownloadSheet
 import com.ytmusicdl.app.ui.screens.SearchScreen
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
         // Inicializar NewPipe Extractor con el downloader HTTP
         NewPipeService.init()
+        PythonBridge.initialize(this)
 
         setContent {
             YtmusicdlTheme {
@@ -34,6 +36,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
+    val pythonReady = remember { PythonBridge.isReady() }
+    val pythonError = remember { PythonBridge.getInitError() }
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
 
     Scaffold(
@@ -48,7 +52,16 @@ fun App() {
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            SearchScreen(onDownload = { selectedTrack = it })
+            Column {
+                if (!pythonReady) {
+                    Text(
+                        text = pythonError ?: "Runtime de Python no disponible; usando fallback NewPipe.",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
+                SearchScreen(onDownload = { selectedTrack = it })
+            }
         }
 
         selectedTrack?.let { track ->

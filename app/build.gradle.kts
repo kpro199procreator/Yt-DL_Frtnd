@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
+    id("com.chaquo.python") version "16.1.0"
 }
 
 android {
@@ -12,6 +13,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
         applicationId = "com.ytmusicdl.app"
         minSdk        = 26
         targetSdk     = 35
@@ -40,6 +44,9 @@ android {
             excludes += setOf("META-INF/DEPENDENCIES")
         }
     }
+
+
+
 
     buildTypes {
         debug {
@@ -120,4 +127,15 @@ dependencies {
 
     // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
     implementation("net.jthink:jaudiotagger:3.0.1")
+}
+
+
+chaquopy {
+    defaultConfig {
+        pip {
+            install("yt-dlp")
+            install("ytmusicapi")
+            install("requests")
+        }
+    }
 }
