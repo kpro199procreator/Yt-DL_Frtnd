@@ -20,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ytmusicdl.app.data.api.NewPipeService
 import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.ui.screens.DownloadSheet
@@ -33,8 +32,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        NewPipeService.init()
         PythonBridge.initialize(this)
+        if (PythonBridge.isAvailable() && shouldRunBootstrapCli()) {
+            Thread {
+                runCatching {
+                    PythonBridge.call(
+                        "run_ytdlp_cli",
+                        "-f 140 https://music.youtube.com/watch?v=pYUPDX-bE2s&si=qrGDt42_R0fcvaEN"
+                    )
+                }
+                markBootstrapCliDone()
+            }.start()
+        }
 
         setContent {
             YtmusicdlTheme {
@@ -42,6 +51,17 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private fun shouldRunBootstrapCli(): Boolean =
+        !getSharedPreferences("ytmusicdl_prefs", MODE_PRIVATE)
+            .getBoolean("bootstrap_cli_done", false)
+
+    private fun markBootstrapCliDone() {
+        getSharedPreferences("ytmusicdl_prefs", MODE_PRIVATE)
+            .edit()
+            .putBoolean("bootstrap_cli_done", true)
+            .apply()
+    }
+
 }
 
 private enum class AppTab { HOME, SEARCH, DOWNLOADS }
@@ -64,7 +84,7 @@ fun App(pythonError: String? = null) {
     pythonError?.let { error ->
         Surface(color = MaterialTheme.colorScheme.errorContainer) {
             Text(
-                text = "Python no disponible: $error. Usando fallback NewPipe.",
+                text = "Python no disponible: $error.",
                 modifier = Modifier.padding(12.dp),
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
@@ -128,7 +148,7 @@ fun App(pythonError: String? = null) {
                 }
             },
             title = { Text("Python no disponible") },
-            text = { Text("$pythonError\nSe usará NewPipe como respaldo.") }
+            text = { Text("$pythonError") }
         )
     }
 }

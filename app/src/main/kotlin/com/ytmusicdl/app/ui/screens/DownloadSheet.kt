@@ -1,9 +1,11 @@
 package com.ytmusicdl.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -37,6 +39,8 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
     var isLoadingFormats by remember { mutableStateOf(false) }
     var formatsError by remember { mutableStateOf<String?>(null) }
     var audioFormats by remember { mutableStateOf<List<AudioFormatOption>>(emptyList()) }
+    var rawFormatsOutput by remember { mutableStateOf("") }
+    var manualFormatId by remember { mutableStateOf("") }
 
     LaunchedEffect(state, track.videoId) {
         val error = (state as? DownloadState.Error)?.message.orEmpty()
@@ -48,13 +52,17 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
         showFormatSelector = true
         formatsError = null
         audioFormats = emptyList()
-        runCatching {
-            ExtractorBackendProvider.backend.listAudioFormats(track.videoId)
-        }.onSuccess { formats ->
-            audioFormats = formats
-        }.onFailure { throwable ->
-            formatsError = throwable.message ?: "No se pudieron listar formatos"
-        }
+        rawFormatsOutput = ""
+        manualFormatId = ""
+
+        runCatching { ExtractorBackendProvider.backend.listAudioFormats(track.videoId) }
+            .onSuccess { listing ->
+                audioFormats = listing.audioFormats
+                rawFormatsOutput = listing.rawOutput
+            }
+            .onFailure { throwable ->
+                formatsError = throwable.message ?: "No se pudieron listar formatos"
+            }
         isLoadingFormats = false
     }
 
@@ -96,27 +104,6 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                     Text("Cargar canciones del álbum")
                 }
             }
-
-            if (albumTracks.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Text("Descargar pistas del álbum", style = MaterialTheme.typography.titleMedium)
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(albumTracks, key = { it.videoId }) { item ->
-                        ListItem(
-                            headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text(item.artist) },
-                            trailingContent = {
-                                IconButton(onClick = {
-                                    DownloadService.downloadState.value = DownloadState.FetchingStream
-                                    DownloadService.start(context, item, preferredFormatId = null)
-                                }) {
-                                    Icon(Icons.Default.Download, null)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
         }
     }
 
@@ -127,42 +114,54 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
             text = {
                 when {
                     isLoadingFormats -> Text("Cargando formatos disponibles…")
-                    formatsError != null -> Text("Fallo al listar formatos: ${formatsError}")
-                    audioFormats.isEmpty() -> Text("No hay formatos alternativos para esta pista.")
-                    else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
-                        items(audioFormats, key = { it.formatId }) { format ->
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        "${format.formatId} · ${format.ext} · ${format.abr}k · ${format.acodec} · ${
-                                            format.note.ifBlank { "sin nota" }
-                                        }"
-                                    )
-                                },
-                                supportingContent = {
-                                    if (format.asr > 0) Text("${format.asr} Hz")
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
+                    formatsError != null -> Text("Fallo al listar formatos y/o output: ${formatsError}")
+                    audioFormats.isEmpty() -> Column {
+                        Text("No hay formatos audio-only. Salida completa:")
+                        Spacer(Modifier.height(8.dp))
+                        Text(rawFormatsOutput, modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()))
+                    }
+                    else -> Column {
+                        Text(rawFormatsOutput, modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).verticalScroll(rememberScrollState()))
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = manualFormatId,
+                            onValueChange = { manualFormatId = it },
+                            label = { Text("Format ID manual (ej. 140)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                            items(audioFormats, key = { it.formatId }) { format ->
+                                ListItem(
+                                    headlineContent = { Text("${format.formatId} · ${format.ext} · ${format.abr}k · ${format.acodec} · ${format.note.ifBlank { "sin nota" }}") },
+                                    supportingContent = { if (format.asr > 0) Text("${format.asr} Hz") },
+                                    modifier = Modifier.fillMaxWidth().clickable {
                                         showFormatSelector = false
                                         DownloadService.downloadState.value = DownloadState.FetchingStream
                                         DownloadService.start(context, track, preferredFormatId = format.formatId)
-                                    },
-                                tonalElevation = 0.dp
-                            )
-                            HorizontalDivider()
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFormatSelector = false }) { Text("Cerrar") }
+                TextButton(onClick = {
+                    val selectedId = manualFormatId.trim()
+                    if (selectedId.isNotEmpty()) {
+                        showFormatSelector = false
+                        DownloadService.downloadState.value = DownloadState.FetchingStream
+                        DownloadService.start(context, track, preferredFormatId = selectedId)
+                    } else {
+                        showFormatSelector = false
+                    }
+                }) { Text("Usar ID") }
             },
             dismissButton = {
-                if (audioFormats.isNotEmpty() && !isLoadingFormats && formatsError == null) {
-                    TextButton(onClick = { showFormatSelector = false }) { Text("Cancelar") }
-                }
+                TextButton(onClick = { showFormatSelector = false }) { Text("Cerrar") }
             }
         )
     }

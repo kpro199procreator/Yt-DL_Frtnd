@@ -5,6 +5,7 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONArray
+import com.ytmusicdl.app.data.model.AudioFormatListing
 import com.ytmusicdl.app.data.model.AudioFormatOption
 import org.json.JSONObject
 
@@ -57,14 +58,19 @@ object PythonBridge {
     }
 
 
-    fun parseAudioFormatList(json: String): List<AudioFormatOption> {
-        if (json.isBlank() || json == "null") return emptyList()
-        val array = JSONArray(json)
-        return buildList {
+    fun parseAudioFormatListing(json: String): AudioFormatListing {
+        if (json.isBlank() || json == "null") return AudioFormatListing(rawOutput = "", audioFormats = emptyList())
+        val obj = JSONObject(json)
+        val array = obj.optJSONArray("audio_formats") ?: JSONArray()
+        val formats = buildList {
             for (i in 0 until array.length()) {
                 add(parseAudioFormat(array.getJSONObject(i)))
             }
         }
+        return AudioFormatListing(
+            rawOutput = obj.optString("raw_output"),
+            audioFormats = formats,
+        )
     }
 
     private fun parseAudioFormat(obj: JSONObject) = AudioFormatOption(

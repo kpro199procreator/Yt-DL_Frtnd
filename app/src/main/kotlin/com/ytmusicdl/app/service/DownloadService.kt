@@ -7,6 +7,7 @@ import android.os.*
 import androidx.core.app.NotificationCompat
 import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
+import com.ytmusicdl.app.data.AppSettings
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Servicio de descarga en foreground.
  * Flujo:
- *   1. NewPipe extrae la URL de audio del video
+ *   1. yt-dlp/Python backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
  *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
@@ -47,7 +48,7 @@ class DownloadService : Service() {
                 putExtra(EXTRA_TRACK_COVER,  track.coverUrl)
                 putExtra(EXTRA_TRACK_YEAR,   track.year)
                 putExtra(EXTRA_TRACK_DUR,    track.duration)
-                putExtra(EXTRA_PREFERRED_FORMAT_ID, preferredFormatId)
+                putExtra(EXTRA_PREFERRED_FORMAT_ID, preferredFormatId ?: AppSettings.getDefaultFormatId(context))
             }
             context.startForegroundService(intent)
         }
@@ -93,7 +94,7 @@ class DownloadService : Service() {
 
     private suspend fun downloadTrack(track: Track, preferredFormatId: String? = null) {
         try {
-            // 1. Extraer URL de audio con NewPipe
+            // 1. Extraer URL de audio con yt-dlp/Python backend
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 

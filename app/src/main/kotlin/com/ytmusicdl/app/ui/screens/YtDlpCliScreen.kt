@@ -1,7 +1,9 @@
 package com.ytmusicdl.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ytmusicdl.app.data.api.PythonBridge
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +33,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun YtDlpCliScreen() {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var argsLine by remember { mutableStateOf("--help") }
+    var defaultFormatId by remember { mutableStateOf(getDefaultFormatId(context)) }
     var output by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var exitCode by remember { mutableStateOf<Int?>(null) }
@@ -53,6 +59,14 @@ fun YtDlpCliScreen() {
         )
 
         OutlinedTextField(
+            value = defaultFormatId,
+            onValueChange = { defaultFormatId = it },
+            label = { Text("Formato por defecto") },
+            supportingText = { Text("Se usa en descargas normales. Ej: 140") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        OutlinedTextField(
             value = argsLine,
             onValueChange = { argsLine = it },
             label = { Text("Argumentos") },
@@ -60,7 +74,12 @@ fun YtDlpCliScreen() {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                setDefaultFormatId(context, defaultFormatId)
+                defaultFormatId = getDefaultFormatId(context)
+            }) { Text("Guardar formato") }
+
             Button(
                 onClick = {
                     if (!PythonBridge.isAvailable()) {
@@ -88,6 +107,11 @@ fun YtDlpCliScreen() {
                     }
                 }
             ) { Text("Ejecutar") }
+
+            Button(onClick = {
+                val saved = getDefaultFormatId(context)
+                argsLine = "-f $saved https://music.youtube.com/watch?v=pYUPDX-bE2s&si=qrGDt42_R0fcvaEN"
+            }) { Text("Probar comando 140") }
         }
 
         if (loading) CircularProgressIndicator()
@@ -107,4 +131,19 @@ fun YtDlpCliScreen() {
             }
         }
     }
+}
+
+
+private fun getDefaultFormatId(context: android.content.Context): String =
+    context.getSharedPreferences("ytmusicdl_prefs", android.content.Context.MODE_PRIVATE)
+        .getString("default_format_id", "140")
+        ?.trim()
+        ?.ifBlank { "140" }
+        ?: "140"
+
+private fun setDefaultFormatId(context: android.content.Context, value: String) {
+    context.getSharedPreferences("ytmusicdl_prefs", android.content.Context.MODE_PRIVATE)
+        .edit()
+        .putString("default_format_id", value.trim().ifBlank { "140" })
+        .apply()
 }
