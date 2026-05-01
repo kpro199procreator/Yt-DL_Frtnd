@@ -1,5 +1,6 @@
 package com.ytmusicdl.app.data.api
 
+import com.ytmusicdl.app.data.model.AudioFormatOption
 import com.ytmusicdl.app.data.model.Track
 
 object NewPipeFallbackBackend : ExtractorBackend {
@@ -22,4 +23,6 @@ object NewPipeFallbackBackend : ExtractorBackend {
         NewPipeService.getTrackInfo(videoIdOrQuery)
 
     override suspend fun getLyrics(title: String, artist: String): String? = null
+
+    override suspend fun listAudioFormats(videoId: String): List<AudioFormatOption> = emptyList()
 }

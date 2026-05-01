@@ -1,5 +1,6 @@
 package com.ytmusicdl.app.data.api
 
+import com.ytmusicdl.app.data.model.AudioFormatOption
 import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,6 +24,11 @@ object EmbeddedPythonBackend : ExtractorBackend {
     override suspend fun getLyrics(title: String, artist: String): String? = withContext(Dispatchers.IO) {
         val result = PythonBridge.call("get_lyrics", title, artist)
         result.takeIf { it.isNotBlank() && it != "null" }
+    }
+
+    override suspend fun listAudioFormats(videoId: String): List<AudioFormatOption> = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("list_audio_formats", videoId)
+        PythonBridge.parseAudioFormatList(json)
     }
 }
 
