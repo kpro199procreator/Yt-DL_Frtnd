@@ -71,7 +71,10 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
-                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track, null) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
+                is DownloadState.Idle -> Button(onClick = {
+                    DownloadService.downloadState.value = DownloadState.FetchingStream
+                    DownloadService.start(context, track, preferredFormatId = null)
+                }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
                 is DownloadState.FetchingStream -> Text("Obteniendo stream…")
                 is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
                 is DownloadState.Converting -> Text("Convirtiendo audio…")
@@ -103,7 +106,10 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                             headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text(item.artist) },
                             trailingContent = {
-                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item, null) }) {
+                                IconButton(onClick = {
+                                    DownloadService.downloadState.value = DownloadState.FetchingStream
+                                    DownloadService.start(context, item, preferredFormatId = null)
+                                }) {
                                     Icon(Icons.Default.Download, null)
                                 }
                             }
@@ -128,20 +134,20 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                             ListItem(
                                 headlineContent = {
                                     Text(
-                                        "${format.formatId} • ${format.ext} • ${format.abr} kbps • ${
+                                        "${format.formatId} · ${format.ext} · ${format.abr}k · ${format.acodec} · ${
                                             format.note.ifBlank { "sin nota" }
                                         }"
                                     )
                                 },
                                 supportingContent = {
-                                    Text("${format.acodec} • ${format.protocol}")
+                                    if (format.asr > 0) Text("${format.asr} Hz")
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
                                         showFormatSelector = false
                                         DownloadService.downloadState.value = DownloadState.FetchingStream
-                                        DownloadService.start(context, track, format.formatId)
+                                        DownloadService.start(context, track, preferredFormatId = format.formatId)
                                     },
                                 tonalElevation = 0.dp
                             )
