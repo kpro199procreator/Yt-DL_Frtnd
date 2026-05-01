@@ -21,6 +21,10 @@ android {
 
         // Necesario para NewPipe Extractor con minSdk < 33
         multiDexEnabled = true
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
     }
 
     // Desugaring para que NewPipe Extractor funcione en Android < 13
@@ -59,12 +63,6 @@ android {
     }
 
 
-
-    sourceSets {
-        getByName("main") {
-            python.srcDir("src/main/python")
-        }
-    }
 
     chaquopy {
         defaultConfig {
