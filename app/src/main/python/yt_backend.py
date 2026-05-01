@@ -39,7 +39,6 @@ def extract_audio(video_id, preferred_format_id=None):
         "skip_download": True,
         "noplaylist": True,
         "ignoreconfig": True,
-        "format": "bestaudio/best",
     }
     try:
         with YoutubeDL(opts) as ydl:
@@ -58,7 +57,7 @@ def extract_audio(video_id, preferred_format_id=None):
             "message": "No hay formatos de audio válidos para este video.",
         })
 
-    preferred = str(preferred_format_id or "").strip()
+    preferred = str(preferred_format_id or "140").strip()
     selected = next((f for f in candidates if str(f.get("format_id")) == preferred), None) if preferred else None
 
     if not selected:
@@ -91,7 +90,6 @@ def list_audio_formats(video_id):
         "skip_download": True,
         "noplaylist": True,
         "ignoreconfig": True,
-        "format": "bestaudio/best",
     }
     try:
         with YoutubeDL(opts) as ydl:
@@ -185,10 +183,10 @@ def run_ytdlp_cli(args_line="--help"):
     stderr_buffer = io.StringIO()
 
     try:
-        from yt_dlp import __main__ as ytdlp_main
+        from yt_dlp import main as ytdlp_main
         with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
             try:
-                ytdlp_main.main(argv)
+                ytdlp_main(argv)
                 exit_code = 0
             except SystemExit as e:
                 code = e.code

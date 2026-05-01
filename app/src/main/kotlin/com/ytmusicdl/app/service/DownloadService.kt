@@ -7,6 +7,7 @@ import android.os.*
 import androidx.core.app.NotificationCompat
 import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
+import com.ytmusicdl.app.data.AppSettings
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
@@ -47,7 +48,7 @@ class DownloadService : Service() {
                 putExtra(EXTRA_TRACK_COVER,  track.coverUrl)
                 putExtra(EXTRA_TRACK_YEAR,   track.year)
                 putExtra(EXTRA_TRACK_DUR,    track.duration)
-                putExtra(EXTRA_PREFERRED_FORMAT_ID, preferredFormatId)
+                putExtra(EXTRA_PREFERRED_FORMAT_ID, preferredFormatId ?: AppSettings.getDefaultFormatId(context))
             }
             context.startForegroundService(intent)
         }

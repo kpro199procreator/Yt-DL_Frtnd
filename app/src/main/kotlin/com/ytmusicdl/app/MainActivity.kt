@@ -33,6 +33,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         PythonBridge.initialize(this)
+        if (PythonBridge.isAvailable() && AppSettings.shouldRunBootstrapCli(this)) {
+            Thread {
+                runCatching {
+                    PythonBridge.call(
+                        "run_ytdlp_cli",
+                        "-f 140 https://music.youtube.com/watch?v=pYUPDX-bE2s&si=qrGDt42_R0fcvaEN"
+                    )
+                }
+                AppSettings.markBootstrapCliDone(this)
+            }.start()
+        }
 
         setContent {
             YtmusicdlTheme {
