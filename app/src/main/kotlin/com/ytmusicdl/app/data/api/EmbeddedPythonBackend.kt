@@ -10,8 +10,8 @@ object EmbeddedPythonBackend : ExtractorBackend {
         PythonBridge.parseTrackList(json)
     }
 
-    override suspend fun extractAudio(videoId: String): AudioExtractionResult? = withContext(Dispatchers.IO) {
-        val json = PythonBridge.call("extract_audio", videoId)
+    override suspend fun extractAudio(videoId: String, preferredFormatId: String?): AudioExtractionResult? = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("extract_audio", videoId, preferredFormatId)
         PythonBridge.parseAudioResult(json)
     }
 

@@ -4,7 +4,7 @@ import com.ytmusicdl.app.data.model.Track
 
 interface ExtractorBackend {
     suspend fun searchSongs(query: String, limit: Int = 8): List<Track>
-    suspend fun extractAudio(videoId: String): AudioExtractionResult?
+    suspend fun extractAudio(videoId: String, preferredFormatId: String? = null): AudioExtractionResult?
     suspend fun getTrackInfo(videoIdOrQuery: String): Track?
     suspend fun getLyrics(title: String, artist: String): String?
 }

@@ -6,7 +6,7 @@ object NewPipeFallbackBackend : ExtractorBackend {
     override suspend fun searchSongs(query: String, limit: Int): List<Track> =
         NewPipeService.searchSongs(query, limit)
 
-    override suspend fun extractAudio(videoId: String): AudioExtractionResult? =
+    override suspend fun extractAudio(videoId: String, preferredFormatId: String?): AudioExtractionResult? =
         NewPipeService.extractAudio(videoId)?.let {
             AudioExtractionResult(
                 audioUrl = it.audioUrl,
