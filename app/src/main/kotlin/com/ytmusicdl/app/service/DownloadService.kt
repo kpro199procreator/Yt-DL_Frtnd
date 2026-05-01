@@ -5,8 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.NewPipeService
 import com.ytmusicdl.app.data.model.DownloadState
@@ -25,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * Flujo:
  *   1. NewPipe extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
- *   3. Si es webm/opus → ffmpeg-kit convierte a m4a
+ *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
  *   5. Guarda en ~/Music en almacenamiento externo
  */
@@ -95,28 +94,38 @@ class DownloadService : Service() {
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 
-            val (audioUrl, ext) = NewPipeService.extractAudioUrl(track.videoId)
+            val extraction = NewPipeService.extractAudio(track.videoId)
                 ?: run {
                     downloadState.value = DownloadState.Error("No se pudo extraer el stream")
                     stopSelf(); return
                 }
 
+            val audioUrl = extraction.audioUrl
+            val ext = extraction.containerExt
+
+            val enrichedTrack = track.copy(
+                title = track.title.ifBlank { extraction.title },
+                artist = track.artist.ifBlank { extraction.artist },
+                coverUrl = track.coverUrl.ifBlank { extraction.coverUrl },
+                streamUrl = audioUrl,
+            )
+
             // 2. Descargar el audio
             val tempFile = File(cacheDir, "${track.videoId}_temp.$ext")
             downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal ->
                 downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
-                updateNotification("Descargando ${track.title}", progress)
+                updateNotification("Descargando ${enrichedTrack.title}", progress)
             }
 
             // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
             downloadState.value = DownloadState.Converting
             updateNotification("Procesando audio…", 100)
-            val finalFile = convertIfNeeded(tempFile, track, ext)
+            val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
 
             // 4. Escribir tags
             downloadState.value = DownloadState.WritingTags
             updateNotification("Escribiendo metadata…", 100)
-            writeTags(finalFile, track)
+            writeTags(finalFile, enrichedTrack)
 
             // 5. Mover a carpeta de música
             val outputDir  = File(
@@ -124,7 +133,7 @@ class DownloadService : Service() {
                     android.os.Environment.DIRECTORY_MUSIC
                 ), "ytmusicdl"
             ).also { it.mkdirs() }
-            val outputFile = File(outputDir, sanitize("${track.artist} - ${track.title}.m4a"))
+            val outputFile = File(outputDir, sanitize("${enrichedTrack.artist} - ${enrichedTrack.title}.m4a"))
             finalFile.copyTo(outputFile, overwrite = true)
             tempFile.delete()
             finalFile.delete()
@@ -135,7 +144,7 @@ class DownloadService : Service() {
             )
 
             downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            updateNotification("✓ ${track.title} descargado", 100)
+            updateNotification("✓ ${enrichedTrack.title} descargado", 100)
 
         } catch (e: Exception) {
             downloadState.value = DownloadState.Error(e.message ?: "Error desconocido")
@@ -182,12 +191,12 @@ class DownloadService : Service() {
         withContext(Dispatchers.IO) {
             if (ext == "m4a") return@withContext input
 
-            // webm/opus → m4a con ffmpeg-kit
+            // webm/opus → m4a con mobile-ffmpeg
             val output = File(cacheDir, "${track.videoId}.m4a")
-            val session = FFmpegKit.execute(
+            val rc = FFmpeg.execute(
                 "-i \"${input.absolutePath}\" -c:a aac -b:a 256k -vn \"${output.absolutePath}\""
             )
-            if (!ReturnCode.isSuccess(session.returnCode)) {
+            if (rc != 0) {
                 // Si ffmpeg falla, devolver el archivo original sin convertir
                 return@withContext input
             }
