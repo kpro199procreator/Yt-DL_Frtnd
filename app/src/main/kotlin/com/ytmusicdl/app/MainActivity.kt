@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ytmusicdl.app.data.api.NewPipeService
+import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.ui.screens.DownloadSheet
 import com.ytmusicdl.app.ui.screens.HomeScreen
@@ -39,9 +41,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         NewPipeService.init()
+        PythonBridge.initialize(this)
 
         setContent {
-            YtmusicdlTheme { App() }
+            YtmusicdlTheme { App(pythonError = PythonBridge.getInitError()) }
         }
     }
 }
@@ -50,10 +53,21 @@ private enum class AppTab(val label: String) { HOME("Inicio"), SEARCH("Buscar"),
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App() {
+fun App(pythonError: String? = null) {
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var seedQuery by remember { mutableStateOf("") }
+
+
+        pythonError?.let { error ->
+            Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer) {
+                Text(
+                    text = "Python no disponible: $error. Usando fallback NewPipe.",
+                    modifier = Modifier.padding(12.dp),
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("ytmusicdl") }) },
