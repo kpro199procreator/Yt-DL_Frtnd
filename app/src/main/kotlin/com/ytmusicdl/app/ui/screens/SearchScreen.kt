@@ -18,7 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.ytmusicdl.app.data.api.NewPipeService
+import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.launch
 
@@ -28,7 +28,9 @@ fun SearchScreen(
     onDownload: (Track) -> Unit,
     initialQuery: String = "",
 ) {
+    enum class SearchMode { SONGS, ALBUMS }
     var query by remember { mutableStateOf(initialQuery) }
+    var mode by remember { mutableStateOf(SearchMode.SONGS) }
     var results by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -43,7 +45,10 @@ fun SearchScreen(
         loading = true; error = null
         scope.launch {
             try {
-                results = NewPipeService.searchSongs(q)
+                results = when (mode) {
+                    SearchMode.SONGS -> ExtractorBackendProvider.backend.searchSongs(q)
+                    SearchMode.ALBUMS -> ExtractorBackendProvider.backend.searchAlbums(q)
+                }
                 if (results.isEmpty()) error = "Sin resultados para \"$q\""
             } catch (e: Exception) {
                 error = e.message ?: "Error de búsqueda"
@@ -69,6 +74,20 @@ fun SearchScreen(
                 }
             },
         ) {}
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            SegmentedButton(
+                selected = mode == SearchMode.SONGS,
+                onClick = { mode = SearchMode.SONGS },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            ) { Text("Songs") }
+            SegmentedButton(
+                selected = mode == SearchMode.ALBUMS,
+                onClick = { mode = SearchMode.ALBUMS },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            ) { Text("Albums") }
+        }
 
         AnimatedContent(targetState = Triple(loading, error, results)) { (isLoading, err, itemsState) ->
             when {

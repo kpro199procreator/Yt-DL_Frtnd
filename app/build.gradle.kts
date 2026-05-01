@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
+    id("com.chaquo.python") version "16.1.0"
 }
 
 android {
@@ -20,6 +21,10 @@ android {
 
         // Necesario para NewPipe Extractor con minSdk < 33
         multiDexEnabled = true
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
     }
 
     // Desugaring para que NewPipe Extractor funcione en Android < 13
@@ -54,6 +59,18 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+
+
+    chaquopy {
+        defaultConfig {
+            pip {
+                install("yt-dlp")
+                install("ytmusicapi")
+                install("requests")
+            }
         }
     }
 
