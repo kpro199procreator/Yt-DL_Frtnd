@@ -38,7 +38,7 @@ class DownloadService : Service() {
         // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
 
-        fun start(context: Context, track: Track) {
+        fun start(context: Context, track: Track, preferredFormatId: String? = null) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 putExtra(EXTRA_TRACK_TITLE,  track.title)
                 putExtra(EXTRA_TRACK_ARTIST, track.artist)
@@ -47,6 +47,7 @@ class DownloadService : Service() {
                 putExtra(EXTRA_TRACK_COVER,  track.coverUrl)
                 putExtra(EXTRA_TRACK_YEAR,   track.year)
                 putExtra(EXTRA_TRACK_DUR,    track.duration)
+                putExtra(EXTRA_PREFERRED_FORMAT_ID, preferredFormatId)
             }
             context.startForegroundService(intent)
         }
@@ -58,6 +59,7 @@ class DownloadService : Service() {
         private const val EXTRA_TRACK_COVER  = "coverUrl"
         private const val EXTRA_TRACK_YEAR   = "year"
         private const val EXTRA_TRACK_DUR    = "duration"
+        private const val EXTRA_PREFERRED_FORMAT_ID = "preferredFormatId"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -84,17 +86,18 @@ class DownloadService : Service() {
         )
 
         startForeground(NOTIF_ID, buildNotification("Preparando descarga…", 0))
-        scope.launch { downloadTrack(track) }
+        val preferredFormatId = intent?.getStringExtra(EXTRA_PREFERRED_FORMAT_ID)
+        scope.launch { downloadTrack(track, preferredFormatId) }
         return START_NOT_STICKY
     }
 
-    private suspend fun downloadTrack(track: Track) {
+    private suspend fun downloadTrack(track: Track, preferredFormatId: String? = null) {
         try {
             // 1. Extraer URL de audio con NewPipe
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 
-            val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId)
+            val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId, preferredFormatId)
                 ?: run {
                     downloadState.value = DownloadState.Error("No se pudo extraer el stream")
                     stopSelf(); return
