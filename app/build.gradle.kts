@@ -47,19 +47,6 @@ android {
 
 
 
-    sourceSets {
-        getByName("main") {
-            python.srcDir("src/main/python")
-        }
-    }
-
-    python {
-        pip {
-            install("yt-dlp")
-            install("ytmusicapi")
-            install("requests")
-        }
-    }
 
     buildTypes {
         debug {
@@ -140,4 +127,15 @@ dependencies {
 
     // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
     implementation("net.jthink:jaudiotagger:3.0.1")
+}
+
+
+chaquopy {
+    defaultConfig {
+        pip {
+            install("yt-dlp")
+            install("ytmusicapi")
+            install("requests")
+        }
+    }
 }
