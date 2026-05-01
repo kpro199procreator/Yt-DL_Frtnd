@@ -20,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ytmusicdl.app.data.AppSettings
 import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.ui.screens.DownloadSheet
