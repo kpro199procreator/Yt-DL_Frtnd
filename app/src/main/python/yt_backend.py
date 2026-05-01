@@ -1,4 +1,7 @@
 import json
+import io
+import re
+from contextlib import redirect_stdout
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 from ytmusicapi import YTMusic
@@ -93,21 +96,38 @@ def list_audio_formats(video_id):
     try:
         with YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            out = io.StringIO()
+            with redirect_stdout(out):
+                ydl.list_formats(info)
+            list_formats_output = out.getvalue()
     except DownloadError:
         return json.dumps([])
 
     formats = info.get("formats") or []
+    note_by_id = {}
+    line_pattern = re.compile(r"^\s*(\S+)\s+(\S+)\s+(.+)$")
+    for raw_line in list_formats_output.splitlines():
+        line = raw_line.strip()
+        if not line or line.lower().startswith("id ") or line.startswith("[info]"):
+            continue
+        m = line_pattern.match(raw_line)
+        if not m:
+            continue
+        format_id = m.group(1).strip()
+        note_by_id[format_id] = m.group(3).strip()
+
     audio_formats = []
     for fmt in formats:
         if fmt.get("vcodec") != "none":
             continue
+        fmt_id = str(fmt.get("format_id") or "")
         audio_formats.append({
-            "format_id": str(fmt.get("format_id") or ""),
+            "format_id": fmt_id,
             "ext": fmt.get("ext", ""),
             "abr": int(fmt.get("abr") or 0),
             "acodec": fmt.get("acodec", ""),
             "protocol": fmt.get("protocol", ""),
-            "note": fmt.get("format_note", "") or fmt.get("format", ""),
+            "note": note_by_id.get(fmt_id) or fmt.get("format_note", "") or fmt.get("format", ""),
         })
     return json.dumps(audio_formats)
 
