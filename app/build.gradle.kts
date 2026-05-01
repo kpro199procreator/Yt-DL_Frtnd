@@ -19,7 +19,6 @@ android {
         versionCode   = 1
         versionName   = "0.1.0-alpha"
 
-        // Necesario para NewPipe Extractor con minSdk < 33
         multiDexEnabled = true
 
         ndk {
@@ -27,7 +26,6 @@ android {
         }
     }
 
-    // Desugaring para que NewPipe Extractor funcione en Android < 13
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
@@ -96,7 +94,6 @@ fun localProp(key: String): String {
 }
 
 dependencies {
-    // Desugaring — necesario para NewPipe con minSdk 26
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.2")
 
     // Compose
@@ -126,10 +123,6 @@ dependencies {
 
     // ExoPlayer — reproducción de preview
     implementation(libs.media3.exoplayer)
-
-    // NewPipe Extractor — búsqueda y extracción de streams YT Music
-    // sin necesidad de API key ni Python
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.2")
 
     // mobile-ffmpeg (LTS) como reemplazo de ffmpeg-kit
     // Variante min para mantener tamaño menor del APK

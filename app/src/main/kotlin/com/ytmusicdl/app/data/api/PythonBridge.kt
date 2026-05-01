@@ -58,6 +58,9 @@ object PythonBridge {
     fun parseAudioResult(json: String): AudioExtractionResult? {
         if (json.isBlank() || json == "null") return null
         val obj = JSONObject(json)
+        if (obj.optBoolean("error", false)) {
+            throw IllegalStateException(obj.optString("message", "No se pudo extraer audio"))
+        }
         return AudioExtractionResult(
             audioUrl = obj.optString("audioUrl"),
             containerExt = obj.optString("containerExt", "m4a"),

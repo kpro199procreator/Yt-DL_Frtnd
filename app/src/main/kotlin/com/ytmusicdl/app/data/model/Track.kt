@@ -15,7 +15,7 @@ data class Track(
     val year:        String  = "",
     val coverUrl:    String  = "",
     val duration:    String  = "",
-    val streamUrl:   String  = "",   // URL de audio extraída por NewPipe
+    val streamUrl:   String  = "",   // URL de audio extraída por backend
     val trackNumber: Int     = 0,
     val totalTracks: Int     = 0,
 )
