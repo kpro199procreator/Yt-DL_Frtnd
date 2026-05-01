@@ -1,8 +1,13 @@
 package com.ytmusicdl.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,106 +18,71 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val state   by DownloadService.downloadState.collectAsState()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val state by DownloadService.downloadState.collectAsState()
+    val scope = rememberCoroutineScope()
+    var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier            = Modifier.fillMaxWidth()
-                .padding(horizontal = 24.dp).padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Carátula grande
-            AsyncImage(
-                model             = track.coverUrl,
-                contentDescription = null,
-                contentScale      = ContentScale.Crop,
-                modifier          = Modifier.size(180.dp)
-                    .clip(MaterialTheme.shapes.large),
-            )
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                IconButton(onClick = onDismiss) { Icon(Icons.Default.ArrowBack, null) }
+            }
+            AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(180.dp).clip(MaterialTheme.shapes.large))
+            Spacer(Modifier.height(12.dp))
+            Text(track.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(track.artist, color = MaterialTheme.colorScheme.primary)
+            if (track.album.isNotBlank()) Text(track.album, color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
             Spacer(Modifier.height(16.dp))
 
-            Text(track.title, style = MaterialTheme.typography.titleLarge,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary)
-            if (track.album.isNotEmpty())
-                Text(track.album, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
-
-            Spacer(Modifier.height(24.dp))
-
             when (val s = state) {
-                is DownloadState.Idle -> {
-                    Button(
-                        onClick  = {
-                            DownloadService.downloadState.value = DownloadState.FetchingStream
-                            DownloadService.start(context, track)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Descargar") }
-                }
-                is DownloadState.FetchingStream -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(8.dp))
-                    Text("Obteniendo stream de audio…",
-                        style = MaterialTheme.typography.bodySmall)
-                }
-                is DownloadState.Downloading -> {
-                    LinearProgressIndicator(
-                        progress = { s.progress / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${s.progress}%", style = MaterialTheme.typography.bodySmall)
-                        Text("${s.mbDone} / ${s.mbTotal} MB",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
+                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
+                is DownloadState.FetchingStream -> Text("Obteniendo stream…")
+                is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
+                is DownloadState.Converting -> Text("Convirtiendo audio…")
+                is DownloadState.WritingTags -> Text("Escribiendo metadata…")
+                is DownloadState.Done -> Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("¡Descargado!") }
+                is DownloadState.Error -> Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error); Spacer(Modifier.width(8.dp)); Text(s.message, color = MaterialTheme.colorScheme.error) }
+            }
+
+            if (track.album.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        albumTracks = ExtractorBackendProvider.backend.searchSongs("${track.artist} ${track.album}", 30)
+                            .filter { it.album.equals(track.album, ignoreCase = true) || it.artist.contains(track.artist, true) }
                     }
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Download, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Cargar canciones del álbum")
                 }
-                is DownloadState.Converting -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(8.dp))
-                    Text("Convirtiendo a m4a…", style = MaterialTheme.typography.bodySmall)
-                }
-                is DownloadState.WritingTags -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(8.dp))
-                    Text("Escribiendo metadata y letras…",
-                        style = MaterialTheme.typography.bodySmall)
-                }
-                is DownloadState.Done -> {
-                    Icon(Icons.Default.CheckCircle, null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text("¡Descargado!", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = {
-                        DownloadService.downloadState.value = DownloadState.Idle
-                        onDismiss()
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") }
-                }
-                is DownloadState.Error -> {
-                    Icon(Icons.Default.Error, null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(40.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Text(s.message, color = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = {
-                        DownloadService.downloadState.value = DownloadState.Idle
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Reintentar") }
+            }
+
+            if (albumTracks.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text("Descargar pistas del álbum", style = MaterialTheme.typography.titleMedium)
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(albumTracks, key = { it.videoId }) { item ->
+                        ListItem(
+                            headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            supportingContent = { Text(item.artist) },
+                            trailingContent = {
+                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
+                                    Icon(Icons.Default.Download, null)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
