@@ -65,34 +65,36 @@ object NewPipeService {
     }
 
     suspend fun searchSongs(query: String, limit: Int = 8): List<Track> = withContext(Dispatchers.IO) {
-        try {
-            val extractor: SearchExtractor = ServiceList.YouTube.getSearchExtractor(
-                query,
-                listOf("EgWKAQIIAWoKEAMQBBAKEAkQBQ%3D%3D"),
-                null,
-            )
-            extractor.fetchPage()
-
-            extractor.initialPage.items.take(limit).mapNotNull { item ->
-                val streamItem = item as? org.schabi.newpipe.extractor.stream.StreamInfoItem ?: return@mapNotNull null
-                val videoId = streamItem.url
-                    .substringAfter("v=", "")
-                    .substringBefore("&")
-                    .ifBlank { streamItem.url.substringAfterLast("/", "") }
-                if (videoId.isBlank()) return@mapNotNull null
-
-                Track(
-                    videoId = videoId,
-                    title = streamItem.name,
-                    artist = streamItem.uploaderName ?: "",
-                    duration = streamItem.duration?.let { formatDuration(it) } ?: "",
-                    coverUrl = streamItem.thumbnails.lastOrNull()?.url ?: "",
-                )
-            }
-        } catch (_: Exception) {
-            emptyList()
+        runCatching {
+            buildSearchExtractor(query, musicFilter = true).toTracks(limit)
+        }.getOrElse {
+            runCatching { buildSearchExtractor(query, musicFilter = false).toTracks(limit) }
+                .getOrElse { emptyList() }
         }
     }
+
+    private fun buildSearchExtractor(query: String, musicFilter: Boolean): SearchExtractor {
+        val filters = if (musicFilter) listOf("EgWKAQIIAWoKEAMQBBAKEAkQBQ%3D%3D") else emptyList()
+        return ServiceList.YouTube.getSearchExtractor(query, filters, null).apply { fetchPage() }
+    }
+
+    private fun SearchExtractor.toTracks(limit: Int): List<Track> =
+        initialPage.items.take(limit).mapNotNull { item ->
+            val streamItem = item as? org.schabi.newpipe.extractor.stream.StreamInfoItem ?: return@mapNotNull null
+            val videoId = streamItem.url
+                .substringAfter("v=", "")
+                .substringBefore("&")
+                .ifBlank { streamItem.url.substringAfterLast("/", "") }
+            if (videoId.isBlank()) return@mapNotNull null
+
+            Track(
+                videoId = videoId,
+                title = streamItem.name,
+                artist = streamItem.uploaderName ?: "",
+                duration = streamItem.duration?.let { formatDuration(it) } ?: "",
+                coverUrl = streamItem.thumbnails.lastOrNull()?.url ?: "",
+            )
+        }
 
     suspend fun extractAudio(videoId: String): AudioExtractionResult? = withContext(Dispatchers.IO) {
         try {
