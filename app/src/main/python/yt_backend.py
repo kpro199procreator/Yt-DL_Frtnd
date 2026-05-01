@@ -121,12 +121,13 @@ def list_audio_formats(video_id):
         if fmt.get("vcodec") != "none":
             continue
         fmt_id = str(fmt.get("format_id") or "")
+        abr_value = fmt.get("abr") or fmt.get("tbr") or 0
         audio_formats.append({
             "format_id": fmt_id,
             "ext": fmt.get("ext", ""),
-            "abr": int(fmt.get("abr") or 0),
+            "abr": int(abr_value or 0),
             "acodec": fmt.get("acodec", ""),
-            "protocol": fmt.get("protocol", ""),
+            "asr": int(fmt.get("asr") or 0),
             "note": note_by_id.get(fmt_id) or fmt.get("format_note", "") or fmt.get("format", ""),
         })
     return json.dumps(audio_formats)
