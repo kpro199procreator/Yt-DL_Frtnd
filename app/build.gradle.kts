@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
+    id("com.chaquo.python") version "16.1.0"
 }
 
 android {
@@ -54,6 +55,24 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+
+
+    sourceSets {
+        getByName("main") {
+            python.srcDir("src/main/python")
+        }
+    }
+
+    chaquopy {
+        defaultConfig {
+            pip {
+                install("yt-dlp")
+                install("ytmusicapi")
+                install("requests")
+            }
         }
     }
 
