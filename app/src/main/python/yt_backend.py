@@ -1,5 +1,6 @@
 import json
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 from ytmusicapi import YTMusic
 import requests
 
@@ -34,9 +35,17 @@ def extract_audio(video_id, preferred_format_id=None):
         "quiet": True,
         "skip_download": True,
         "noplaylist": True,
+        "ignoreconfig": True,
+        "format": "bestaudio/best",
     }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError as e:
+        return json.dumps({
+            "error": True,
+            "message": f"No se pudo obtener metadata de audio: {str(e)}",
+        })
 
     formats = info.get("formats") or []
     candidates = [f for f in formats if f.get("vcodec") == "none" and f.get("url")]
@@ -78,9 +87,14 @@ def list_audio_formats(video_id):
         "quiet": True,
         "skip_download": True,
         "noplaylist": True,
+        "ignoreconfig": True,
+        "format": "bestaudio/best",
     }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError:
+        return json.dumps([])
 
     formats = info.get("formats") or []
     audio_formats = []
