@@ -71,7 +71,7 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             when (val s = state) {
-                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
+                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track, null) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
                 is DownloadState.FetchingStream -> Text("Obteniendo stream…")
                 is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
                 is DownloadState.Converting -> Text("Convirtiendo audio…")
@@ -103,7 +103,7 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                             headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text(item.artist) },
                             trailingContent = {
-                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
+                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item, null) }) {
                                     Icon(Icons.Default.Download, null)
                                 }
                             }

@@ -166,3 +166,34 @@ def get_lyrics(title, artist):
     except Exception:
         pass
     return ""
+
+
+def run_ytdlp_cli(args_line="--help"):
+    import shlex
+    import contextlib
+
+    argv = shlex.split(args_line or "")
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+
+    try:
+        from yt_dlp import __main__ as ytdlp_main
+        with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+            try:
+                ytdlp_main.main(argv)
+                exit_code = 0
+            except SystemExit as e:
+                code = e.code
+                exit_code = code if isinstance(code, int) else 1
+    except Exception as e:
+        return json.dumps({
+            "exitCode": 1,
+            "stdout": stdout_buffer.getvalue(),
+            "stderr": stderr_buffer.getvalue() + f"\n{e}",
+        })
+
+    return json.dumps({
+        "exitCode": exit_code,
+        "stdout": stdout_buffer.getvalue(),
+        "stderr": stderr_buffer.getvalue(),
+    })

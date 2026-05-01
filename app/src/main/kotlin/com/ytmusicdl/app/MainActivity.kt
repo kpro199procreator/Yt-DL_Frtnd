@@ -26,6 +26,7 @@ import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.ui.screens.DownloadSheet
 import com.ytmusicdl.app.ui.screens.HomeScreen
 import com.ytmusicdl.app.ui.screens.SearchScreen
+import com.ytmusicdl.app.ui.screens.YtDlpCliScreen
 import com.ytmusicdl.app.ui.theme.YtmusicdlTheme
 
 class MainActivity : ComponentActivity() {
@@ -90,7 +91,7 @@ fun App(pythonError: String? = null) {
                     selected = tab == AppTab.DOWNLOADS,
                     onClick = { tab = AppTab.DOWNLOADS },
                     icon = { Icon(Icons.Default.Download, null) },
-                    label = { Text("Descargas") }
+                    label = { Text("CLI") }
                 )
             }
         },
@@ -107,9 +108,7 @@ fun App(pythonError: String? = null) {
                         onDownload = { selectedTrack = it },
                         initialQuery = seedQuery
                     )
-                    AppTab.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
-                        Text("Historial próximamente", modifier = Modifier.padding(24.dp))
-                    }
+                    AppTab.DOWNLOADS -> YtDlpCliScreen()
                 }
             }
         }
