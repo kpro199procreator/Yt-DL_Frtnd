@@ -16,21 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ytmusicdl.app.data.api.NewPipeService
@@ -47,7 +34,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         NewPipeService.init()
         PythonBridge.initialize(this)
-        setContent { YtmusicdlTheme { App(PythonBridge.getInitError()) } }
+
+        setContent {
+            YtmusicdlTheme {
+                App(PythonBridge.getInitError())
+            }
+        }
     }
 }
 
@@ -56,40 +48,88 @@ private enum class AppTab { HOME, SEARCH, DOWNLOADS }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(pythonError: String? = null) {
+
     RequestStartupPermissions()
-    var showPythonError by remember(pythonError) { mutableStateOf(!pythonError.isNullOrBlank()) }
+
+    var showPythonError by remember(pythonError) {
+        mutableStateOf(!pythonError.isNullOrBlank())
+    }
+
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var seedQuery by remember { mutableStateOf("") }
+
+    // 🔴 Banner estilo versión vieja (fusionado)
+    pythonError?.let { error ->
+        Surface(color = MaterialTheme.colorScheme.errorContainer) {
+            Text(
+                text = "Python no disponible: $error. Usando fallback NewPipe.",
+                modifier = Modifier.padding(12.dp),
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("ytmusicdl") }) },
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(tab == AppTab.HOME, { tab = AppTab.HOME }, { Icon(Icons.Default.Home, null) }, label = { Text("Inicio") })
-                NavigationBarItem(tab == AppTab.SEARCH, { tab = AppTab.SEARCH }, { Icon(Icons.Default.Search, null) }, label = { Text("Buscar") })
-                NavigationBarItem(tab == AppTab.DOWNLOADS, { tab = AppTab.DOWNLOADS }, { Icon(Icons.Default.Download, null) }, label = { Text("Descargas") })
+                NavigationBarItem(
+                    selected = tab == AppTab.HOME,
+                    onClick = { tab = AppTab.HOME },
+                    icon = { Icon(Icons.Default.Home, null) },
+                    label = { Text("Inicio") }
+                )
+                NavigationBarItem(
+                    selected = tab == AppTab.SEARCH,
+                    onClick = { tab = AppTab.SEARCH },
+                    icon = { Icon(Icons.Default.Search, null) },
+                    label = { Text("Buscar") }
+                )
+                NavigationBarItem(
+                    selected = tab == AppTab.DOWNLOADS,
+                    onClick = { tab = AppTab.DOWNLOADS },
+                    icon = { Icon(Icons.Default.Download, null) },
+                    label = { Text("Descargas") }
+                )
             }
         },
     ) { padding ->
+
         Box(Modifier.fillMaxSize().padding(padding)) {
             Crossfade(targetState = tab, label = "tab") { current ->
                 when (current) {
-                    AppTab.HOME -> HomeScreen(onQuickSearch = { seedQuery = it; tab = AppTab.SEARCH })
-                    AppTab.SEARCH -> SearchScreen(onDownload = { selectedTrack = it }, initialQuery = seedQuery)
-                    AppTab.DOWNLOADS -> Box(Modifier.fillMaxSize()) { Text("Historial próximamente", modifier = Modifier.padding(24.dp)) }
+                    AppTab.HOME -> HomeScreen {
+                        seedQuery = it
+                        tab = AppTab.SEARCH
+                    }
+                    AppTab.SEARCH -> SearchScreen(
+                        onDownload = { selectedTrack = it },
+                        initialQuery = seedQuery
+                    )
+                    AppTab.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
+                        Text("Historial próximamente", modifier = Modifier.padding(24.dp))
+                    }
                 }
             }
         }
-        selectedTrack?.let { track -> DownloadSheet(track = track, onDismiss = { selectedTrack = null }) }
+
+        selectedTrack?.let {
+            DownloadSheet(track = it, onDismiss = { selectedTrack = null })
+        }
     }
 
+    // 🧠 Dialog moderno (de la versión nueva)
     if (showPythonError && !pythonError.isNullOrBlank()) {
         AlertDialog(
             onDismissRequest = { showPythonError = false },
-            confirmButton = { TextButton(onClick = { showPythonError = false }) { Text("OK") } },
+            confirmButton = {
+                TextButton(onClick = { showPythonError = false }) {
+                    Text("OK")
+                }
+            },
             title = { Text("Python no disponible") },
-            text = { Text("$pythonError\nSe usará NewPipe como respaldo.") },
+            text = { Text("$pythonError\nSe usará NewPipe como respaldo.") }
         )
     }
 }
@@ -106,8 +146,13 @@ private fun RequestStartupPermissions() {
             }
         }.toTypedArray()
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {}
+
     var launched by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         if (!launched) {
             launched = true
