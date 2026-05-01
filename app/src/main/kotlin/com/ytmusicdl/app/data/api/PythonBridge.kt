@@ -72,7 +72,7 @@ object PythonBridge {
         ext = obj.optString("ext"),
         abr = obj.optInt("abr", 0),
         acodec = obj.optString("acodec"),
-        protocol = obj.optString("protocol"),
+        asr = obj.optInt("asr", 0),
         note = obj.optString("note"),
     )
 

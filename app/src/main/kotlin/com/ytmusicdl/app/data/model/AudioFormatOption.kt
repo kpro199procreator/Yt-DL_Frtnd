@@ -5,6 +5,6 @@ data class AudioFormatOption(
     val ext: String,
     val abr: Int,
     val acodec: String,
-    val protocol: String,
+    val asr: Int,
     val note: String,
 )
