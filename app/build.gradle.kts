@@ -114,9 +114,9 @@ dependencies {
     // sin necesidad de API key ni Python
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.2")
 
-    // ffmpeg-kit (fork community — el original fue archivado abril 2025)
-    // Solo el paquete de audio para menor tamaño
-    implementation("com.github.pgahq:ffmpeg-kit-fork:audio-6.0-2")
+    // mobile-ffmpeg (LTS) como reemplazo de ffmpeg-kit
+    // Variante min para mantener tamaño menor del APK
+    implementation("com.github.tanersener:mobile-ffmpeg:4.4.LTS")
 
     // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
     implementation("net.jthink:jaudiotagger:3.0.1")
