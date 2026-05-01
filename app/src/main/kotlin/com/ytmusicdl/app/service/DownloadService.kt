@@ -8,7 +8,7 @@ import androidx.core.app.NotificationCompat
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import com.ytmusicdl.app.data.api.LrcLibService
-import com.ytmusicdl.app.data.api.NewPipeService
+import com.ytmusicdl.app.data.api.ExtractorProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.*
@@ -95,7 +95,7 @@ class DownloadService : Service() {
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 
-            val (audioUrl, ext) = NewPipeService.extractAudioUrl(track.videoId)
+            val (audioUrl, ext) = ExtractorProvider.backend.extractAudioUrl(track.videoId)
                 ?: run {
                     downloadState.value = DownloadState.Error("No se pudo extraer el stream")
                     stopSelf(); return

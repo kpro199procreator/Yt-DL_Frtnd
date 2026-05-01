@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
+    id("com.chaquo.python") version "16.1.0"
 }
 
 android {
@@ -12,6 +13,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
         applicationId = "com.ytmusicdl.app"
         minSdk        = 26
         targetSdk     = 35
@@ -38,6 +42,22 @@ android {
         jniLibs {
             // Excluir duplicados de dependencias nativas
             excludes += setOf("META-INF/DEPENDENCIES")
+        }
+    }
+
+
+
+    sourceSets {
+        getByName("main") {
+            python.srcDir("src/main/python")
+        }
+    }
+
+    python {
+        pip {
+            install("yt-dlp")
+            install("ytmusicapi")
+            install("requests")
         }
     }
 
