@@ -51,6 +51,17 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private fun shouldRunBootstrapCli(): Boolean =
+        !getSharedPreferences("ytmusicdl_prefs", MODE_PRIVATE)
+            .getBoolean("bootstrap_cli_done", false)
+
+    private fun markBootstrapCliDone() {
+        getSharedPreferences("ytmusicdl_prefs", MODE_PRIVATE)
+            .edit()
+            .putBoolean("bootstrap_cli_done", true)
+            .apply()
+    }
+
 }
 
 private enum class AppTab { HOME, SEARCH, DOWNLOADS }

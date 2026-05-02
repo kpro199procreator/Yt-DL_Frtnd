@@ -133,3 +133,18 @@ fun YtDlpCliScreen() {
         }
     }
 }
+
+
+private fun getDefaultFormatId(context: android.content.Context): String =
+    context.getSharedPreferences("ytmusicdl_prefs", android.content.Context.MODE_PRIVATE)
+        .getString("default_format_id", "140")
+        ?.trim()
+        ?.ifBlank { "140" }
+        ?: "140"
+
+private fun setDefaultFormatId(context: android.content.Context, value: String) {
+    context.getSharedPreferences("ytmusicdl_prefs", android.content.Context.MODE_PRIVATE)
+        .edit()
+        .putString("default_format_id", value.trim().ifBlank { "140" })
+        .apply()
+}
