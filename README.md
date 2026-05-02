@@ -33,3 +33,15 @@ git push origin v0.1.0-alpha
 
 El ffmpeg-kit original fue archivado en abril 2025.
 Este proyecto usa el fork de la comunidad `pgahq/ffmpeg-kit-fork`.
+
+## CLI rápido para yt-dlp
+
+Puedes ejecutar `yt-dlp` desde este repo con un wrapper mínimo:
+
+```bash
+python3 tools/ytdlp_cli.py -- --help
+python3 tools/ytdlp_cli.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+python3 tools/ytdlp_cli.py -- -F "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+> Nota: requiere `yt-dlp` instalado en tu `PATH`.

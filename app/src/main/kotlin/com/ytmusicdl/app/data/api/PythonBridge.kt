@@ -5,6 +5,8 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import org.json.JSONArray
+import com.ytmusicdl.app.data.model.AudioFormatListing
+import com.ytmusicdl.app.data.model.AudioFormatOption
 import org.json.JSONObject
 
 object PythonBridge {
@@ -55,9 +57,37 @@ object PythonBridge {
         return parseTrack(JSONObject(json))
     }
 
+
+    fun parseAudioFormatListing(json: String): AudioFormatListing {
+        if (json.isBlank() || json == "null") return AudioFormatListing(rawOutput = "", audioFormats = emptyList())
+        val obj = JSONObject(json)
+        val array = obj.optJSONArray("audio_formats") ?: JSONArray()
+        val formats = buildList {
+            for (i in 0 until array.length()) {
+                add(parseAudioFormat(array.getJSONObject(i)))
+            }
+        }
+        return AudioFormatListing(
+            rawOutput = obj.optString("raw_output"),
+            audioFormats = formats,
+        )
+    }
+
+    private fun parseAudioFormat(obj: JSONObject) = AudioFormatOption(
+        formatId = obj.optString("format_id"),
+        ext = obj.optString("ext"),
+        abr = obj.optInt("abr", 0),
+        acodec = obj.optString("acodec"),
+        asr = obj.optInt("asr", 0),
+        note = obj.optString("note"),
+    )
+
     fun parseAudioResult(json: String): AudioExtractionResult? {
         if (json.isBlank() || json == "null") return null
         val obj = JSONObject(json)
+        if (obj.optBoolean("error", false)) {
+            throw IllegalStateException(obj.optString("message", "No se pudo extraer audio"))
+        }
         return AudioExtractionResult(
             audioUrl = obj.optString("audioUrl"),
             containerExt = obj.optString("containerExt", "m4a"),

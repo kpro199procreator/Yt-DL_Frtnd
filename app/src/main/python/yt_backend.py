@@ -1,5 +1,9 @@
 import json
+import io
+import re
+from contextlib import redirect_stdout
 from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 from ytmusicapi import YTMusic
 import requests
 
@@ -28,24 +32,109 @@ def search_tracks(query, limit=8):
     return json.dumps(tracks)
 
 
-def extract_audio(video_id):
+def extract_audio(video_id, preferred_format_id=None):
     url = f"https://www.youtube.com/watch?v={video_id}"
     opts = {
         "quiet": True,
         "skip_download": True,
-        "format": "bestaudio/best",
         "noplaylist": True,
+        "ignoreconfig": True,
     }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError as e:
+        return json.dumps({
+            "error": True,
+            "message": f"No se pudo obtener metadata de audio: {str(e)}",
+        })
+
+    formats = info.get("formats") or []
+    candidates = [f for f in formats if f.get("vcodec") == "none" and f.get("url")]
+    if not candidates:
+        return json.dumps({
+            "error": True,
+            "message": "No hay formatos de audio válidos para este video.",
+        })
+
+    preferred = str(preferred_format_id or "140").strip()
+    selected = next((f for f in candidates if str(f.get("format_id")) == preferred), None) if preferred else None
+
+    if not selected:
+        preferred_ext_order = {"m4a": 0, "webm": 1, "opus": 2}
+
+        def rank(fmt):
+            ext_rank = preferred_ext_order.get((fmt.get("ext") or "").lower(), 99)
+            abr = float(fmt.get("abr") or 0)
+            tbr = float(fmt.get("tbr") or 0)
+            bitrate = abr if abr > 0 else tbr
+            return ext_rank, -bitrate, str(fmt.get("format_id") or "")
+
+        selected = sorted(candidates, key=rank)[0]
 
     return json.dumps({
-        "audioUrl": info.get("url", ""),
-        "containerExt": info.get("ext", "m4a"),
-        "bitrate": int(info.get("abr") or 0),
+        "audioUrl": selected.get("url", ""),
+        "containerExt": selected.get("ext", "m4a"),
+        "bitrate": int(selected.get("abr") or selected.get("tbr") or 0),
         "artist": info.get("uploader", ""),
         "title": info.get("title", ""),
         "coverUrl": info.get("thumbnail", ""),
+        "formatId": str(selected.get("format_id") or ""),
+    })
+
+
+def list_audio_formats(video_id):
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    opts = {
+        "quiet": True,
+        "skip_download": True,
+        "noplaylist": True,
+        "ignoreconfig": True,
+    }
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            out = io.StringIO()
+            with redirect_stdout(out):
+                ydl.list_formats(info)
+            list_formats_output = out.getvalue()
+    except DownloadError as e:
+        return json.dumps({
+            "raw_output": f"ERROR: {str(e)}",
+            "audio_formats": [],
+        })
+
+    formats = info.get("formats") or []
+    note_by_id = {}
+    line_pattern = re.compile(r"^\s*(\S+)\s+(\S+)\s+(.+)$")
+    for raw_line in list_formats_output.splitlines():
+        line = raw_line.strip()
+        if not line or line.lower().startswith("id ") or line.startswith("[info]"):
+            continue
+        m = line_pattern.match(raw_line)
+        if not m:
+            continue
+        format_id = m.group(1).strip()
+        note_by_id[format_id] = m.group(3).strip()
+
+    audio_formats = []
+    for fmt in formats:
+        if fmt.get("vcodec") != "none":
+            continue
+        fmt_id = str(fmt.get("format_id") or "")
+        abr_value = fmt.get("abr") or fmt.get("tbr") or 0
+        audio_formats.append({
+            "format_id": fmt_id,
+            "ext": fmt.get("ext", ""),
+            "abr": int(abr_value or 0),
+            "acodec": fmt.get("acodec", ""),
+            "asr": int(fmt.get("asr") or 0),
+            "note": note_by_id.get(fmt_id) or fmt.get("format_note", "") or fmt.get("format", ""),
+        })
+
+    return json.dumps({
+        "raw_output": list_formats_output,
+        "audio_formats": audio_formats,
     })
 
 
@@ -83,3 +172,34 @@ def get_lyrics(title, artist):
     except Exception:
         pass
     return ""
+
+
+def run_ytdlp_cli(args_line="--help"):
+    import shlex
+    import contextlib
+
+    argv = shlex.split(args_line or "")
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+
+    try:
+        from yt_dlp import main as ytdlp_main
+        with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+            try:
+                ytdlp_main(argv)
+                exit_code = 0
+            except SystemExit as e:
+                code = e.code
+                exit_code = code if isinstance(code, int) else 1
+    except Exception as e:
+        return json.dumps({
+            "exitCode": 1,
+            "stdout": stdout_buffer.getvalue(),
+            "stderr": stderr_buffer.getvalue() + f"\n{e}",
+        })
+
+    return json.dumps({
+        "exitCode": exit_code,
+        "stdout": stdout_buffer.getvalue(),
+        "stderr": stderr_buffer.getvalue(),
+    })
