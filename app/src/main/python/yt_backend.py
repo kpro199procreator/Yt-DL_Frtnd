@@ -33,8 +33,9 @@ def extract_audio(video_id):
     opts = {
         "quiet": True,
         "skip_download": True,
-        "format": "bestaudio/best",
+        "format": "bestaudio[ext=m4a]/140/bestaudio[ext=webm]/bestaudio/best",
         "noplaylist": True,
+        "extractor_retries": 3,
     }
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
