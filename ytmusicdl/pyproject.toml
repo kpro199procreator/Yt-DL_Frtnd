@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ytmusicdl"
+version = "0.1.0"
+description = "Descarga música de YouTube Music — alternativa a spotdl para Termux"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "yt-dlp>=2024.1.0",
+    "ytmusicapi>=1.3.0",
+    "mutagen>=1.47.0",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+    "requests>=2.31.0",
+    # syncedlyrics es opcional pero muy recomendado
+    # pip install syncedlyrics
+]
+
+[project.optional-dependencies]
+lyrics = ["syncedlyrics>=0.4.0"]
+fingerprint = ["pyacoustid>=1.3.0"]
+toml-write = ["tomli-w>=1.0.0"]  # Para escritura de config en Python < 3.11
+all = ["syncedlyrics>=0.4.0", "pyacoustid>=1.3.0", "tomli-w>=1.0.0"]
+
+[project.scripts]
+ytmusicdl = "ytmusicdl.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ytmusicdl*"]
