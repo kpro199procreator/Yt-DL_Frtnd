@@ -37,7 +37,7 @@ def _make_ydl_opts(output_dir: Path, audio_format: str,
             on_bytes(d.get("total_bytes", 0), d.get("total_bytes", 0))
 
     return {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "format": "140",  # m4a AAC 128kbps — consistente con yt_backend.py
         "outtmpl": str(output_dir / "%(artist)s - %(title)s.%(ext)s"),
         "quiet": True,
         "no_warnings": True,

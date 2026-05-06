@@ -27,7 +27,7 @@ except ImportError:
 
 DEFAULTS: dict[str, Any] = {
     "download": {
-        "format": "m4a",
+        "format": "140",
         "quality": "best",
         "output_dir": str(default_music_dir()),
         "concurrent": 3,

@@ -5,29 +5,19 @@ import android.content.Context
 import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
-import com.arthenica.mobileffmpeg.FFmpeg
-import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
+import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
-/**
- * Servicio de descarga en foreground.
- * Flujo:
- *   1. NewPipe extrae la URL de audio del video
- *   2. OkHttp descarga el stream de audio (m4a/webm)
- *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
- *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
- *   5. Guarda en ~/Music en almacenamiento externo
- */
 class DownloadService : Service() {
 
     companion object {
@@ -35,7 +25,6 @@ class DownloadService : Service() {
         const val NOTIF_ID      = 1001
         const val EXTRA_TRACK   = "track"
 
-        // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
 
         fun start(context: Context, track: Track) {
@@ -61,10 +50,9 @@ class DownloadService : Service() {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS)  // Sin timeout para descargas largas
+        .readTimeout(0, TimeUnit.SECONDS)
         .build()
 
     override fun onCreate() {
@@ -90,62 +78,10 @@ class DownloadService : Service() {
 
     private suspend fun downloadTrack(track: Track) {
         try {
-            // 1. Extraer URL de audio con NewPipe
-            downloadState.value = DownloadState.FetchingStream
-            updateNotification("Obteniendo stream…", 0)
-
-            val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId)
-                ?: run {
-                    downloadState.value = DownloadState.Error("No se pudo extraer el stream")
-                    stopSelf(); return
-                }
-
-            val audioUrl = extraction.audioUrl
-            val ext = extraction.containerExt
-
-            val enrichedTrack = track.copy(
-                title = track.title.ifBlank { extraction.title },
-                artist = track.artist.ifBlank { extraction.artist },
-                coverUrl = track.coverUrl.ifBlank { extraction.coverUrl },
-                streamUrl = audioUrl,
-            )
-
-            // 2. Descargar el audio
-            val tempFile = File(cacheDir, "${track.videoId}_temp.$ext")
-            downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal ->
-                downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
-                updateNotification("Descargando ${enrichedTrack.title}", progress)
+            if (PythonBridge.isAvailable()) {
+                if (downloadWithPython(track)) return
             }
-
-            // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
-            downloadState.value = DownloadState.Converting
-            updateNotification("Procesando audio…", 100)
-            val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
-
-            // 4. Escribir tags
-            downloadState.value = DownloadState.WritingTags
-            updateNotification("Escribiendo metadata…", 100)
-            writeTags(finalFile, enrichedTrack)
-
-            // 5. Mover a carpeta de música
-            val outputDir  = File(
-                android.os.Environment.getExternalStoragePublicDirectory(
-                    android.os.Environment.DIRECTORY_MUSIC
-                ), "ytmusicdl"
-            ).also { it.mkdirs() }
-            val outputFile = File(outputDir, sanitize("${enrichedTrack.artist} - ${enrichedTrack.title}.m4a"))
-            finalFile.copyTo(outputFile, overwrite = true)
-            tempFile.delete()
-            finalFile.delete()
-
-            // Notificar al sistema de medios
-            android.media.MediaScannerConnection.scanFile(
-                this, arrayOf(outputFile.absolutePath), null, null
-            )
-
-            downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            updateNotification("✓ ${enrichedTrack.title} descargado", 100)
-
+            downloadWithFallback(track)
         } catch (e: Exception) {
             downloadState.value = DownloadState.Error(e.message ?: "Error desconocido")
             updateNotification("Error: ${e.message}", 0)
@@ -153,6 +89,76 @@ class DownloadService : Service() {
             delay(3000)
             stopSelf()
         }
+    }
+
+    private suspend fun downloadWithPython(track: Track): Boolean = withContext(Dispatchers.IO) {
+        downloadState.value = DownloadState.FetchingStream
+        updateNotification("Descargando con backend Python…", 10)
+
+        val outputDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+            "ytmusicdl"
+        ).also { it.mkdirs() }
+
+        val resultJson = PythonBridge.call(
+            "download_track_full",
+            track.videoId,
+            outputDir.absolutePath,
+            track.title,
+            track.artist,
+            track.album,
+            track.year,
+            track.coverUrl,
+        )
+        val obj = JSONObject(resultJson)
+        if (obj.optString("status") == "ok" || obj.optString("status") == "skipped") {
+            val path = obj.optString("path")
+            if (path.isNotBlank()) {
+                MediaScannerConnection.scanFile(this@DownloadService, arrayOf(path), null, null)
+                downloadState.value = DownloadState.Done(path)
+                updateNotification("✓ ${track.title.ifBlank { "Descarga" }} completado", 100)
+                return@withContext true
+            }
+        }
+
+        val err = obj.optString("error", "Error en backend Python")
+        updateNotification("Python falló, usando fallback…", 0)
+        downloadState.value = DownloadState.Error(err)
+        false
+    }
+
+    private suspend fun downloadWithFallback(track: Track) {
+        downloadState.value = DownloadState.FetchingStream
+        updateNotification("Obteniendo stream…", 0)
+
+        val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId)
+            ?: throw Exception("No se pudo extraer el stream")
+
+        val enrichedTrack = track.copy(
+            title = track.title.ifBlank { extraction.title },
+            artist = track.artist.ifBlank { extraction.artist },
+        )
+
+        val tempFile = File(cacheDir, "${track.videoId}_temp.${extraction.containerExt}")
+        downloadAudio(extraction.audioUrl, tempFile) { progress, mbDone, mbTotal ->
+            downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
+            updateNotification("Descargando ${enrichedTrack.title}", progress)
+        }
+
+        val outputDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+            "ytmusicdl"
+        ).also { it.mkdirs() }
+        val outputFile = File(
+            outputDir,
+            sanitize("${enrichedTrack.artist} - ${enrichedTrack.title}.${extraction.containerExt}")
+        )
+        tempFile.copyTo(outputFile, overwrite = true)
+        tempFile.delete()
+
+        MediaScannerConnection.scanFile(this, arrayOf(outputFile.absolutePath), null, null)
+        downloadState.value = DownloadState.Done(outputFile.absolutePath)
+        updateNotification("✓ ${enrichedTrack.title} descargado (fallback)", 100)
     }
 
     private suspend fun downloadAudio(
@@ -166,9 +172,9 @@ class DownloadService : Service() {
         val resp = httpClient.newCall(req).execute()
         val body = resp.body ?: throw Exception("Response body vacío")
 
-        val total     = body.contentLength()
+        val total = body.contentLength()
         var downloaded = 0L
-        val buffer    = ByteArray(8192)
+        val buffer = ByteArray(8192)
 
         FileOutputStream(dest).use { out ->
             body.byteStream().use { input ->
@@ -178,8 +184,8 @@ class DownloadService : Service() {
                     downloaded += read
                     if (total > 0) {
                         val progress = (downloaded * 100 / total).toInt()
-                        val mbDone   = downloaded / 1_048_576f
-                        val mbTotal  = total / 1_048_576f
+                        val mbDone = downloaded / 1_048_576f
+                        val mbTotal = total / 1_048_576f
                         onProgress(progress, mbDone, mbTotal)
                     }
                 }
@@ -187,77 +193,8 @@ class DownloadService : Service() {
         }
     }
 
-    private suspend fun convertIfNeeded(input: File, track: Track, ext: String): File =
-        withContext(Dispatchers.IO) {
-            if (ext == "m4a") return@withContext input
-
-            // webm/opus → m4a con mobile-ffmpeg
-            val output = File(cacheDir, "${track.videoId}.m4a")
-            val rc = FFmpeg.execute(
-                "-i \"${input.absolutePath}\" -c:a aac -b:a 256k -vn \"${output.absolutePath}\""
-            )
-            if (rc != 0) {
-                // Si ffmpeg falla, devolver el archivo original sin convertir
-                return@withContext input
-            }
-            output
-        }
-
-    private suspend fun writeTags(file: File, track: Track) = withContext(Dispatchers.IO) {
-        try {
-            val audioFile = org.jaudiotagger.audio.AudioFileIO.read(file)
-            val tag       = audioFile.tagOrCreateAndSetDefault
-
-            tag.setField(org.jaudiotagger.tag.FieldKey.TITLE,  track.title)
-            tag.setField(org.jaudiotagger.tag.FieldKey.ARTIST, track.artist)
-            if (track.album.isNotEmpty())
-                tag.setField(org.jaudiotagger.tag.FieldKey.ALBUM, track.album)
-            if (track.year.isNotEmpty())
-                tag.setField(org.jaudiotagger.tag.FieldKey.YEAR, track.year)
-
-            // Carátula
-            if (track.coverUrl.isNotEmpty()) {
-                try {
-                    val coverBytes = fetchBytes(track.coverUrl)
-                    if (coverBytes != null) {
-                        val artwork = org.jaudiotagger.tag.images.ArtworkFactory
-                            .createArtworkFromFile(file)
-                        artwork.binaryData = coverBytes
-                        artwork.mimeType   = "image/jpeg"
-                        tag.setField(artwork)
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // Letras LRC desde lrclib
-            try {
-                val lyrics = LrcLibService.getLyrics(track.title, track.artist, track.album)
-                if (lyrics != null) {
-                    val lrcText = lyrics.syncedLyrics ?: lyrics.plainLyrics ?: ""
-                    if (lrcText.isNotEmpty()) {
-                        tag.setField(org.jaudiotagger.tag.FieldKey.LYRICS, lrcText)
-                    }
-                }
-            } catch (_: Exception) {}
-
-            audioFile.commit()
-        } catch (e: Exception) {
-            // Tags son opcionales — no interrumpir la descarga si fallan
-        }
-    }
-
-    private fun fetchBytes(url: String): ByteArray? {
-        return try {
-            val req  = Request.Builder().url(url).build()
-            val resp = httpClient.newCall(req).execute()
-            resp.body?.bytes()
-        } catch (e: Exception) { null }
-    }
-
     private fun sanitize(name: String) =
         name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
-
-    // ── Notificaciones ────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(

@@ -66,9 +66,16 @@ android {
 
     chaquopy {
         defaultConfig {
+            sourceSets {
+                getByName("main") {
+                    srcDir("../ytmusicdl")
+                }
+            }
             pip {
                 install("yt-dlp")
                 install("ytmusicapi")
+                install("mutagen")        // reemplaza JAudioTagger para escribir tags
+                install("syncedlyrics")  // letras con múltiples proveedores
                 install("requests")
             }
         }
@@ -131,10 +138,4 @@ dependencies {
     // sin necesidad de API key ni Python
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.2")
 
-    // mobile-ffmpeg (LTS) como reemplazo de ffmpeg-kit
-    // Variante min para mantener tamaño menor del APK
-    implementation("com.github.tanersener:mobile-ffmpeg:4.4.LTS")
-
-    // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
-    implementation("net.jthink:jaudiotagger:3.0.1")
 }
