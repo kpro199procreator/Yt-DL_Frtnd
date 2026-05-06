@@ -3,6 +3,7 @@ package com.ytmusicdl.app.service
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.os.*
 import androidx.core.app.NotificationCompat
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
