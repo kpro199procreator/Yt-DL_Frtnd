@@ -2,6 +2,8 @@
 Gestión de configuración en ~/.config/ytmusicdl/config.toml
 Usa tomllib (stdlib Python 3.11+) con fallback a tomli.
 """
+from __future__ import annotations
+
 
 import sys
 from pathlib import Path

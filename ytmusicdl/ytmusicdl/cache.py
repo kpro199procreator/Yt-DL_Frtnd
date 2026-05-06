@@ -2,6 +2,8 @@
 Caché SQLite offline para búsquedas, metadata y letras.
 Evita re-llamadas innecesarias a APIs y re-descargas.
 """
+from __future__ import annotations
+
 
 import sqlite3
 import json

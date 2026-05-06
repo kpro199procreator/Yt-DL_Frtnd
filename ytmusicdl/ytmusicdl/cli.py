@@ -3,6 +3,8 @@ CLI principal de ytmusicdl v0.3
 Fixes: cover se muestra solo 1 vez (post-descarga), year no muestra None,
        progreso con bytes reales, cover width aumentado a 28.
 """
+from __future__ import annotations
+
 
 import click
 from pathlib import Path

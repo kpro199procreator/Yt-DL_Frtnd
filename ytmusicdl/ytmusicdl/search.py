@@ -1,6 +1,8 @@
 """
 Búsqueda unificada en YT Music con caché SQLite.
 """
+from __future__ import annotations
+
 
 from ytmusicdl import cache
 from ytmusicdl.apis import ytmusic

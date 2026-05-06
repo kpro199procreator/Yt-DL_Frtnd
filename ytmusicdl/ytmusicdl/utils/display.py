@@ -1,6 +1,8 @@
 """
 Helpers de UI usando Rich — tablas, progreso, mensajes de estado.
 """
+from __future__ import annotations
+
 
 from rich.console import Console
 from rich.table import Table

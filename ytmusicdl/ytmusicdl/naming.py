@@ -14,6 +14,8 @@ Variables disponibles:
   {video_id}      ID de YouTube Music
   {ext}           Extensión del archivo (sin punto)
 """
+from __future__ import annotations
+
 
 import re
 from pathlib import Path

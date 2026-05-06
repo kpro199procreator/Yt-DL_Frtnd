@@ -3,6 +3,8 @@ Letras sincronizadas (LRC) y planas.
 Proveedores: lrclib, musixmatch, genius (via syncedlyrics).
 Con caché SQLite para evitar re-consultas.
 """
+from __future__ import annotations
+
 
 import re
 from pathlib import Path
