@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.ytmusicdl.app.data.api.AudioFormatOption
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
@@ -31,6 +32,13 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
     val state by DownloadService.downloadState.collectAsState()
     val scope = rememberCoroutineScope()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var formats by remember { mutableStateOf<List<AudioFormatOption>>(emptyList()) }
+    var selectedFormatId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(track.videoId) {
+        formats = ExtractorBackendProvider.backend.listAudioFormats(track.videoId)
+        selectedFormatId = formats.maxByOrNull { it.bitrate }?.formatId
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -44,8 +52,33 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
             if (track.album.isNotBlank()) Text(track.album, color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
             Spacer(Modifier.height(16.dp))
 
+            if (formats.isNotEmpty()) {
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+                    OutlinedTextField(
+                        value = formats.firstOrNull { it.formatId == selectedFormatId }?.let { "${it.ext} ${it.bitrate}kbps" } ?: "Auto",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Calidad") },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        formats.forEach { f ->
+                            DropdownMenuItem(
+                                text = { Text("${f.ext} ${f.bitrate}kbps ${f.audioCodec}") },
+                                onClick = {
+                                    selectedFormatId = f.formatId
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+
             when (val s = state) {
-                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
+                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track, selectedFormatId) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
                 is DownloadState.FetchingStream -> Text("Obteniendo stream…")
                 is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
                 is DownloadState.Converting -> Text("Convirtiendo audio…")
@@ -77,7 +110,7 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                             headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text(item.artist) },
                             trailingContent = {
-                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
+                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item, selectedFormatId) }) {
                                     Icon(Icons.Default.Download, null)
                                 }
                             }

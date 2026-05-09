@@ -6,6 +6,15 @@ import requests
 _ytmusic = YTMusic()
 
 
+CONTAINER_PRIORITY = {
+    "m4a": 3,
+    "mp4": 3,
+    "aac": 2,
+    "webm": 1,
+    "opus": 1,
+}
+
+
 def _track_from_search_item(item: dict) -> dict:
     artists = item.get("artists") or []
     artist_name = artists[0].get("name", "") if artists else ""
@@ -22,31 +31,118 @@ def _track_from_search_item(item: dict) -> dict:
     }
 
 
-def search_tracks(query, limit=8):
-    results = _ytmusic.search(query, filter="songs", limit=int(limit or 8))
-    tracks = [_track_from_search_item(x) for x in results if x.get("videoId")]
-    return json.dumps(tracks)
+def _score_audio_format(fmt: dict) -> tuple:
+    abr = int(fmt.get("abr") or 0)
+    ext = (fmt.get("ext") or "").lower()
+    container_score = CONTAINER_PRIORITY.get(ext, 0)
+    has_size = 1 if (fmt.get("filesize") or fmt.get("filesize_approx")) else 0
+    protocol = (fmt.get("protocol") or "").lower()
+    protocol_score = 2 if protocol in {"https", "http", "m3u8_native"} else 1 if protocol else 0
+    return abr, container_score, has_size, protocol_score
 
 
-def extract_audio(video_id):
+def list_audio_formats(video_id):
     url = f"https://www.youtube.com/watch?v={video_id}"
     opts = {
         "quiet": True,
         "skip_download": True,
-        "format": "bestaudio[ext=m4a]/140/bestaudio[ext=webm]/bestaudio/best",
         "noplaylist": True,
         "extractor_retries": 3,
     }
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
+    available = []
+    for fmt in info.get("formats") or []:
+        if fmt.get("acodec") in (None, "none"):
+            continue
+        audio_url = fmt.get("url")
+        if not audio_url:
+            continue
+        normalized = {
+            "format_id": str(fmt.get("format_id") or ""),
+            "ext": (fmt.get("ext") or "").lower(),
+            "acodec": fmt.get("acodec") or "",
+            "abr": int(fmt.get("abr") or 0),
+            "asr": int(fmt.get("asr") or 0),
+            "filesize": int(fmt.get("filesize") or fmt.get("filesize_approx") or 0),
+            "protocol": fmt.get("protocol") or "",
+            "format_note": fmt.get("format_note") or "",
+            "url": audio_url,
+        }
+        normalized["_score"] = _score_audio_format(normalized)
+        available.append(normalized)
+
+    if not available:
+        return {
+            "formats": [],
+            "selected": None,
+            "reason": "No audio formats with URL were found",
+            "info": info,
+        }
+
+    available.sort(key=lambda x: x["_score"], reverse=True)
+    selected = dict(available[0])
+    for f in available:
+        f.pop("_score", None)
+    selected.pop("_score", None)
+
+    reason = (
+        f"Selected format_id={selected.get('format_id')} ext={selected.get('ext')} "
+        f"abr={selected.get('abr')}kbps using score priorities "
+        "(abr > container compatibility > filesize/protocol)"
+    )
+
+    return {
+        "formats": available,
+        "selected": selected,
+        "reason": reason,
+        "info": info,
+    }
+
+
+def search_tracks(query, limit=8):
+    results = _ytmusic.search(query, filter="songs", limit=int(limit or 8))
+    tracks = [_track_from_search_item(x) for x in results if x.get("videoId")]
+    return json.dumps(tracks)
+
+
+def get_audio_formats(video_id):
+    decision = list_audio_formats(video_id)
+    payload = {
+        "formats": decision.get("formats", []),
+        "selected": decision.get("selected"),
+        "reason": decision.get("reason", ""),
+    }
+    return json.dumps(payload)
+
+
+def extract_audio(video_id, preferred_format_id=""):
+    decision = list_audio_formats(video_id)
+    selected = decision.get("selected") or {}
+    info = decision.get("info") or {}
+
+    if preferred_format_id:
+        preferred = next((f for f in decision.get("formats", []) if f.get("format_id") == str(preferred_format_id)), None)
+        if preferred:
+            selected = preferred
+            decision["reason"] = f"User selected format_id={preferred_format_id}"
+
     return json.dumps({
-        "audioUrl": info.get("url", ""),
-        "containerExt": info.get("ext", "m4a"),
-        "bitrate": int(info.get("abr") or 0),
+        "audioUrl": selected.get("url", ""),
+        "containerExt": selected.get("ext", "m4a"),
+        "bitrate": int(selected.get("abr") or 0),
         "artist": info.get("uploader", ""),
         "title": info.get("title", ""),
         "coverUrl": info.get("thumbnail", ""),
+        "selectedFormatId": selected.get("format_id", ""),
+        "selectedAudioCodec": selected.get("acodec", ""),
+        "selectedSampleRate": int(selected.get("asr") or 0),
+        "selectedProtocol": selected.get("protocol", ""),
+        "selectedFormatNote": selected.get("format_note", ""),
+        "selectedFileSize": int(selected.get("filesize") or 0),
+        "selectionReason": decision.get("reason", ""),
+        "availableFormats": decision.get("formats", []),
     })
 
 

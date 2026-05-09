@@ -65,7 +65,38 @@ object PythonBridge {
             artist = obj.optString("artist"),
             title = obj.optString("title"),
             coverUrl = obj.optString("coverUrl"),
+            selectedFormatId = obj.optString("selectedFormatId"),
+            selectedAudioCodec = obj.optString("selectedAudioCodec"),
+            selectedSampleRate = obj.optInt("selectedSampleRate", 0),
+            selectedProtocol = obj.optString("selectedProtocol"),
+            selectedFormatNote = obj.optString("selectedFormatNote"),
+            selectedFileSize = obj.optLong("selectedFileSize", 0L),
+            selectionReason = obj.optString("selectionReason"),
         )
+    }
+
+
+    fun parseAudioFormats(json: String): List<AudioFormatOption> {
+        if (json.isBlank() || json == "null") return emptyList()
+        val obj = JSONObject(json)
+        val arr = obj.optJSONArray("formats") ?: JSONArray()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val f = arr.optJSONObject(i) ?: continue
+                add(
+                    AudioFormatOption(
+                        formatId = f.optString("format_id"),
+                        ext = f.optString("ext"),
+                        audioCodec = f.optString("acodec"),
+                        bitrate = f.optInt("abr", 0),
+                        sampleRate = f.optInt("asr", 0),
+                        fileSize = f.optLong("filesize", 0L),
+                        protocol = f.optString("protocol"),
+                        formatNote = f.optString("format_note"),
+                    )
+                )
+            }
+        }
     }
 
     private fun parseTrack(obj: JSONObject) = com.ytmusicdl.app.data.model.Track(
