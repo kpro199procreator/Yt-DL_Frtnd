@@ -42,7 +42,7 @@ def _score_audio_format(fmt: dict) -> tuple:
 
 
 def list_audio_formats(video_id):
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    url = f"https://music.youtube.com/watch?v={video_id}"
     opts = {
         "quiet": True,
         "skip_download": True,
@@ -123,10 +123,15 @@ def extract_audio(video_id, preferred_format_id="140"):
     info = decision.get("info") or {}
 
     if preferred_format_id:
-        preferred = next((f for f in decision.get("formats", []) if f.get("format_id") == str(preferred_format_id)), None)
+        pref = str(preferred_format_id)
+        preferred = next((f for f in decision.get("formats", []) if f.get("format_id") == pref), None)
+        if not preferred and pref == "140":
+            preferred = next((f for f in decision.get("formats", []) if str(f.get("format_id", "")).startswith("140")), None)
         if preferred:
             selected = preferred
-            decision["reason"] = f"User selected format_id={preferred_format_id}"
+            decision["reason"] = f"Preferred format matched: {selected.get('format_id')}"
+        else:
+            decision["reason"] = f"Preferred format {pref} unavailable, fallback to best scored format"
 
     return json.dumps({
         "audioUrl": selected.get("url", ""),

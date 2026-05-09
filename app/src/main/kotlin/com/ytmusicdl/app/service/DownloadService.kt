@@ -101,6 +101,10 @@ class DownloadService : Service() {
 
             val audioUrl = extraction.audioUrl
             val ext = extraction.containerExt
+            if (audioUrl.isBlank()) {
+                downloadState.value = DownloadState.Error("No se encontró URL de audio (${extraction.selectionReason})")
+                stopSelf(); return
+            }
             val qualityLabel = buildQualityLabel(extraction)
             updateNotification("Formato elegido: $qualityLabel", 0)
 
