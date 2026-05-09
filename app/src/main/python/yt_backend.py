@@ -117,7 +117,7 @@ def get_audio_formats(video_id):
     return json.dumps(payload)
 
 
-def extract_audio(video_id, preferred_format_id=""):
+def extract_audio(video_id, preferred_format_id="140"):
     decision = list_audio_formats(video_id)
     selected = decision.get("selected") or {}
     info = decision.get("info") or {}
