@@ -28,5 +28,5 @@ object EmbeddedPythonBackend : ExtractorBackend {
 
 object ExtractorBackendProvider {
     val backend: ExtractorBackend
-        get() = if (PythonBridge.isAvailable()) EmbeddedPythonBackend else NewPipeFallbackBackend
+        get() = EmbeddedPythonBackend
 }
