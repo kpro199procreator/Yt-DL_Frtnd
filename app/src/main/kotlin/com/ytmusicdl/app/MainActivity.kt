@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import com.ytmusicdl.app.ui.screens.DownloadScreen
 import com.ytmusicdl.app.ui.screens.DownloadsHistoryScreen
 import com.ytmusicdl.app.ui.screens.HomeScreen
 import com.ytmusicdl.app.ui.screens.SearchScreen
+import com.ytmusicdl.app.ui.screens.SettingsScreen
 import com.ytmusicdl.app.ui.theme.YtmusicdlTheme
 
 class MainActivity : ComponentActivity() {
@@ -36,7 +38,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppTab { HOME, SEARCH, DOWNLOADS }
+private enum class AppTab { HOME, SEARCH, DOWNLOADS, SETTINGS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +56,7 @@ fun App(pythonError: String? = null) {
                 NavigationBarItem(selected = tab == AppTab.HOME, onClick = { tab = AppTab.HOME; selectedTrack = null }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Inicio") })
                 NavigationBarItem(selected = tab == AppTab.SEARCH, onClick = { tab = AppTab.SEARCH; selectedTrack = null }, icon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar") })
                 NavigationBarItem(selected = tab == AppTab.DOWNLOADS, onClick = { tab = AppTab.DOWNLOADS; selectedTrack = null }, icon = { Icon(Icons.Default.Download, null) }, label = { Text("Descargas") })
+                NavigationBarItem(selected = tab == AppTab.SETTINGS, onClick = { tab = AppTab.SETTINGS; selectedTrack = null }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Ajustes") })
             }
         },
     ) { padding ->
@@ -71,6 +74,7 @@ fun App(pythonError: String? = null) {
                             onGlobalBackendError = { globalBackendError = it },
                         )
                         AppTab.DOWNLOADS -> DownloadsHistoryScreen(onBack = { tab = AppTab.HOME })
+                        AppTab.SETTINGS -> SettingsScreen()
                     }
                 }
             }
