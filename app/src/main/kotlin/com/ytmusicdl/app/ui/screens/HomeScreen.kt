@@ -38,7 +38,7 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             Text("Inicio", style = MaterialTheme.typography.headlineMedium)
@@ -47,7 +47,7 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
         }
 
         item {
@@ -75,7 +75,7 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text(q, style = MaterialTheme.typography.titleMedium)
+                    Text(q, style = MaterialTheme.typography.titleLarge)
                     Text("Búsqueda rápida", style = MaterialTheme.typography.bodySmall)
                 }
             }

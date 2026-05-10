@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
@@ -14,7 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -24,11 +28,32 @@ import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
 import kotlinx.coroutines.launch
 
+private sealed class UnifiedDownloadUiState {
+    data object Idle : UnifiedDownloadUiState()
+    data object Fetching : UnifiedDownloadUiState()
+    data class Downloading(val progress: Int, val mbDone: Float, val mbTotal: Float) : UnifiedDownloadUiState()
+    data object Converting : UnifiedDownloadUiState()
+    data object Tagging : UnifiedDownloadUiState()
+    data class Done(val filepath: String) : UnifiedDownloadUiState()
+    data class Error(val message: String, val technicalDetail: String? = null) : UnifiedDownloadUiState()
+}
+
+private fun DownloadState.toUnifiedUiState(): UnifiedDownloadUiState = when (this) {
+    DownloadState.Idle -> UnifiedDownloadUiState.Idle
+    DownloadState.FetchingStream -> UnifiedDownloadUiState.Fetching
+    is DownloadState.Downloading -> UnifiedDownloadUiState.Downloading(progress, mbDone, mbTotal)
+    DownloadState.Converting -> UnifiedDownloadUiState.Converting
+    DownloadState.WritingTags -> UnifiedDownloadUiState.Tagging
+    is DownloadState.Done -> UnifiedDownloadUiState.Done(filepath)
+    is DownloadState.Error -> UnifiedDownloadUiState.Error(message = message, technicalDetail = message)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val state by DownloadService.downloadState.collectAsState()
+    val uiState = state.toUnifiedUiState()
     val scope = rememberCoroutineScope()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 
@@ -40,18 +65,25 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
             AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(180.dp).clip(MaterialTheme.shapes.large))
             Spacer(Modifier.height(12.dp))
             Text(track.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(track.artist, color = MaterialTheme.colorScheme.primary)
-            if (track.album.isNotBlank()) Text(track.album, color = MaterialTheme.colorScheme.onSurface.copy(0.6f))
+            Text(track.artist, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+            if (track.album.isNotBlank()) Text(track.album, color = MaterialTheme.colorScheme.onSurface.copy(0.6f), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))
 
-            when (val s = state) {
-                is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
-                is DownloadState.FetchingStream -> Text("Obteniendo info…")
-                is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
-                is DownloadState.Converting -> Text("Convirtiendo audio…")
-                is DownloadState.WritingTags -> Text("Escribiendo metadata…")
-                is DownloadState.Done -> Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("¡Descargado!") }
-                is DownloadState.Error -> Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error); Spacer(Modifier.width(8.dp)); Text(s.message, color = MaterialTheme.colorScheme.error) }
+            when (val s = uiState) {
+                UnifiedDownloadUiState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
+                UnifiedDownloadUiState.Fetching -> Text("Obteniendo info…", style = MaterialTheme.typography.bodyLarge)
+                is UnifiedDownloadUiState.Downloading -> ExtendedProgressView(s)
+                UnifiedDownloadUiState.Converting -> Text("Convirtiendo audio…", style = MaterialTheme.typography.bodyLarge)
+                UnifiedDownloadUiState.Tagging -> Text("Escribiendo metadata…", style = MaterialTheme.typography.bodyLarge)
+                is UnifiedDownloadUiState.Done -> DownloadSuccessView(s.filepath)
+                is UnifiedDownloadUiState.Error -> DownloadErrorView(
+                    state = s,
+                    onRetry = {
+                        DownloadService.downloadState.value = DownloadState.FetchingStream
+                        DownloadService.start(context, track)
+                    },
+                    onDismiss = onDismiss,
+                )
             }
 
             if (track.album.isNotBlank()) {
@@ -84,6 +116,61 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExtendedProgressView(state: UnifiedDownloadUiState.Downloading) {
+    val etaSeconds = ((state.mbTotal - state.mbDone).coerceAtLeast(0f) / 0.2f).toInt()
+    val etaText = if (etaSeconds > 0) "~${etaSeconds}s" else "N/A"
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Descargando ${state.progress}%", style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(progress = { state.progress / 100f }, modifier = Modifier.fillMaxWidth())
+            Text("Formato: m4a · Bitrate: variable", style = MaterialTheme.typography.bodyMedium)
+            Text("Descargado: ${"%.2f".format(state.mbDone)}MB / ${"%.2f".format(state.mbTotal)}MB", style = MaterialTheme.typography.bodyMedium)
+            Text("ETA: $etaText", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun DownloadErrorView(state: UnifiedDownloadUiState.Error, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    val clipboard = LocalClipboard.current
+
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(8.dp))
+                Text(state.message, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.titleSmall)
+            }
+            state.technicalDetail?.let {
+                Text(it, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRetry) { Text("Reintentar") }
+                OutlinedButton(onClick = onDismiss) { Text("Cerrar") }
+                IconButton(onClick = { clipboard.setClipEntry(ClipEntry(AnnotatedString(state.technicalDetail ?: state.message))) }) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copiar detalle")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadSuccessView(filePath: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text("¡Descargado!", style = MaterialTheme.typography.titleMedium)
+                Text(filePath, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }

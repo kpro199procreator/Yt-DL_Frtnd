@@ -1,8 +1,6 @@
 package com.ytmusicdl.app.ui.screens
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +25,7 @@ import kotlinx.coroutines.launch
 fun SearchScreen(
     onDownload: (Track) -> Unit,
     initialQuery: String = "",
+    onGlobalBackendError: (String) -> Unit = {},
 ) {
     var query by remember { mutableStateOf(initialQuery) }
     var results by remember { mutableStateOf<List<Track>>(emptyList()) }
@@ -46,21 +45,25 @@ fun SearchScreen(
                 results = ExtractorBackendProvider.backend.searchSongs(q)
                 if (results.isEmpty()) error = "Sin resultados para \"$q\""
             } catch (e: Exception) {
-                error = e.message ?: "Error de búsqueda"
+                val backendMessage = e.message ?: "Error de búsqueda"
+                error = backendMessage
+                onGlobalBackendError(backendMessage)
             } finally {
                 loading = false
             }
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Text("Buscar música", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(8.dp))
         SearchBar(
             query = query,
             onQueryChange = { query = it },
             onSearch = ::doSearch,
             active = false,
             onActiveChange = {},
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Buscar en YouTube Music…") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
@@ -70,11 +73,12 @@ fun SearchScreen(
             },
         ) {}
 
-        AnimatedContent(targetState = Triple(loading, error, results)) { (isLoading, err, itemsState) ->
+        Spacer(Modifier.height(8.dp))
+        AnimatedContent(targetState = Triple(loading, error, results), label = "search_state") { (isLoading, err, itemsState) ->
             when {
                 isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
                 err != null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
-                    Text(err, color = MaterialTheme.colorScheme.error)
+                    Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
                 }
                 itemsState.isEmpty() && query.isNotEmpty() -> Box(
                     Modifier.fillMaxSize().padding(32.dp), Alignment.Center,
@@ -86,7 +90,7 @@ fun SearchScreen(
                     items(itemsState, key = { it.videoId }) { track ->
                         ListItem(
                             headlineContent = {
-                                Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
                             },
                             supportingContent = {
                                 Text(

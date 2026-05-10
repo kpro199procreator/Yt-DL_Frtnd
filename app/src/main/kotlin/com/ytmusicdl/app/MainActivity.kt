@@ -52,21 +52,11 @@ fun App(pythonError: String? = null) {
     var showPythonError by remember(pythonError) {
         mutableStateOf(!pythonError.isNullOrBlank())
     }
+    var globalBackendError by remember { mutableStateOf<String?>(null) }
 
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var seedQuery by remember { mutableStateOf("") }
-
-    // 🔴 Banner estilo versión vieja (fusionado)
-    pythonError?.let { error ->
-        Surface(color = MaterialTheme.colorScheme.errorContainer) {
-            Text(
-                text = "Motor de extracción no disponible: $error.",
-                modifier = Modifier.padding(12.dp),
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-        }
-    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("ytmusicdl") }) },
@@ -103,10 +93,11 @@ fun App(pythonError: String? = null) {
                     }
                     AppTab.SEARCH -> SearchScreen(
                         onDownload = { selectedTrack = it },
-                        initialQuery = seedQuery
+                        initialQuery = seedQuery,
+                        onGlobalBackendError = { globalBackendError = it }
                     )
-                    AppTab.DOWNLOADS -> Box(Modifier.fillMaxSize()) {
-                        Text("Historial próximamente", modifier = Modifier.padding(24.dp))
+                    AppTab.DOWNLOADS -> Box(Modifier.fillMaxSize().padding(24.dp)) {
+                        Text("Historial próximamente", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
@@ -118,6 +109,21 @@ fun App(pythonError: String? = null) {
     }
 
     // 🧠 Dialog moderno (de la versión nueva)
+
+
+    globalBackendError?.let { backendErr ->
+        AlertDialog(
+            onDismissRequest = { globalBackendError = null },
+            confirmButton = {
+                TextButton(onClick = { globalBackendError = null }) {
+                    Text("Cerrar")
+                }
+            },
+            title = { Text("Error global de backend") },
+            text = { Text(backendErr) }
+        )
+    }
+
     if (showPythonError && !pythonError.isNullOrBlank()) {
         AlertDialog(
             onDismissRequest = { showPythonError = false },
