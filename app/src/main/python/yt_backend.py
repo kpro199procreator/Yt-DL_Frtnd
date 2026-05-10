@@ -24,7 +24,7 @@ BASE_YDL_OPTS = {
     "fragment_retries": 5,
     "extractor_args": {
         "youtube": {
-            "player_client": ["android", "web", "ios"],
+            "player_client": ["android_vr", "android_tv", "android", "web", "ios"],
         }
     },
 }
@@ -60,6 +60,7 @@ def _extract_info_with_fallback(url: str):
     # Prioriza comportamiento estilo: yt-dlp -f 140 <url>
     format_attempts = [
         "140",
+        "251",
         "140/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
         "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
     ]
