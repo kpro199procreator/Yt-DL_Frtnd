@@ -46,7 +46,7 @@ fun DownloadSheet(track: Track, onDismiss: () -> Unit) {
 
             when (val s = state) {
                 is DownloadState.Idle -> Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth()) { Text("Descargar canción") }
-                is DownloadState.FetchingStream -> Text("Obteniendo stream…")
+                is DownloadState.FetchingStream -> Text("Obteniendo info…")
                 is DownloadState.Downloading -> Text("Descargando ${s.progress}%")
                 is DownloadState.Converting -> Text("Convirtiendo audio…")
                 is DownloadState.WritingTags -> Text("Escribiendo metadata…")

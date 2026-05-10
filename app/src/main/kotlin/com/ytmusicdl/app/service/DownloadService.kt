@@ -82,7 +82,6 @@ class DownloadService : Service() {
             year     = intent.getStringExtra(EXTRA_TRACK_YEAR)    ?: "",
             duration = intent.getStringExtra(EXTRA_TRACK_DUR)     ?: "",
         )
-
         startForeground(NOTIF_ID, buildNotification("Preparando descarga…", 0))
         scope.launch { downloadTrack(track) }
         return START_NOT_STICKY
@@ -102,6 +101,12 @@ class DownloadService : Service() {
 
             val audioUrl = extraction.audioUrl
             val ext = extraction.containerExt
+            if (audioUrl.isBlank()) {
+                downloadState.value = DownloadState.Error("No se encontró URL de audio (${extraction.selectionReason})")
+                stopSelf(); return
+            }
+            val qualityLabel = buildQualityLabel(extraction)
+            updateNotification("Formato elegido: $qualityLabel", 0)
 
             val enrichedTrack = track.copy(
                 title = track.title.ifBlank { extraction.title },
@@ -114,12 +119,12 @@ class DownloadService : Service() {
             val tempFile = File(cacheDir, "${track.videoId}_temp.$ext")
             downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal ->
                 downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
-                updateNotification("Descargando ${enrichedTrack.title}", progress)
+                updateNotification("Descargando $qualityLabel", progress)
             }
 
             // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
             downloadState.value = DownloadState.Converting
-            updateNotification("Procesando audio…", 100)
+            updateNotification("Procesando $qualityLabel…", 100)
             val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
 
             // 4. Escribir tags
@@ -144,7 +149,7 @@ class DownloadService : Service() {
             )
 
             downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            updateNotification("✓ ${enrichedTrack.title} descargado", 100)
+            updateNotification("✓ ${enrichedTrack.title} descargado ($qualityLabel)", 100)
 
         } catch (e: Exception) {
             downloadState.value = DownloadState.Error(e.message ?: "Error desconocido")
@@ -153,6 +158,14 @@ class DownloadService : Service() {
             delay(3000)
             stopSelf()
         }
+    }
+
+
+    private fun buildQualityLabel(extraction: com.ytmusicdl.app.data.api.AudioExtractionResult): String {
+        val ext = extraction.containerExt.ifBlank { "audio" }
+        val bitrate = extraction.bitrate.takeIf { it > 0 }?.let { " ${it}kbps" } ?: ""
+        val codec = extraction.selectedAudioCodec.takeIf { it.isNotBlank() }?.let { " ${it}" } ?: ""
+        return "${ext}${bitrate}${codec}".trim()
     }
 
     private suspend fun downloadAudio(

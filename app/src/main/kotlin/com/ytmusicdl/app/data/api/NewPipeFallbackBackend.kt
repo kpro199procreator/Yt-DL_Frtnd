@@ -6,7 +6,9 @@ object NewPipeFallbackBackend : ExtractorBackend {
     override suspend fun searchSongs(query: String, limit: Int): List<Track> =
         NewPipeService.searchSongs(query, limit)
 
-    override suspend fun extractAudio(videoId: String): AudioExtractionResult? =
+    override suspend fun listAudioFormats(videoId: String): List<AudioFormatOption> = emptyList()
+
+    override suspend fun extractAudio(videoId: String, preferredFormatId: String?): AudioExtractionResult? =
         NewPipeService.extractAudio(videoId)?.let {
             AudioExtractionResult(
                 audioUrl = it.audioUrl,
@@ -15,6 +17,13 @@ object NewPipeFallbackBackend : ExtractorBackend {
                 artist = it.artist,
                 title = it.title,
                 coverUrl = it.coverUrl,
+                selectedFormatId = "newpipe",
+                selectedAudioCodec = "",
+                selectedSampleRate = 0,
+                selectedProtocol = "https",
+                selectedFormatNote = "NewPipe fallback",
+                selectedFileSize = 0L,
+                selectionReason = "Selected by NewPipe fallback using highest available bitrate",
             )
         }
 
