@@ -1,84 +1,119 @@
 package com.ytmusicdl.app.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import android.content.Context
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+
+private const val PREFS_NAME = "ytmusicdl_prefs"
+private const val KEY_COUNTRY = "selected_country"
+
+private data class ChartTrack(val title: String, val artist: String)
 
 @Composable
 fun HomeScreen(onQuickSearch: (String) -> Unit) {
-    val quickSearches = listOf(
-        "Rara Vez", "Kali Uchis", "Tame Impala", "The Weeknd", "Arctic Monkeys",
-    )
-    var showTips by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    var selectedCountry by remember { mutableStateOf(loadCountry(context)) }
+    var showCountryPicker by remember { mutableStateOf(selectedCountry.isBlank()) }
+
+    if (showCountryPicker) {
+        CountryPickerDialog(
+            onSelect = { country ->
+                selectedCountry = country
+                saveCountry(context, country)
+                showCountryPicker = false
+            }
+        )
+    }
+
+    val globalTop10 = remember {
+        listOf(
+            ChartTrack("Blinding Lights", "The Weeknd"),
+            ChartTrack("Shape of You", "Ed Sheeran"),
+            ChartTrack("As It Was", "Harry Styles"),
+            ChartTrack("bad guy", "Billie Eilish"),
+            ChartTrack("Levitating", "Dua Lipa"),
+            ChartTrack("One Dance", "Drake"),
+            ChartTrack("Stay", "The Kid LAROI"),
+            ChartTrack("Someone You Loved", "Lewis Capaldi"),
+            ChartTrack("Sunflower", "Post Malone"),
+            ChartTrack("Señorita", "Shawn Mendes & Camila Cabello"),
+        )
+    }
+
+    val countryTop20 = remember(selectedCountry) { buildCountryTop20(selectedCountry) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Inicio", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Descubre música y comienza una búsqueda rápida.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            )
-            Spacer(Modifier.height(10.dp))
+            Text("Top 10 más escuchadas", style = MaterialTheme.typography.headlineMedium)
+            Text("Listado global", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        items(globalTop10) { track ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onQuickSearch("${track.title} ${track.artist}") }) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(track.artist, style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
 
         item {
-            AnimatedVisibility(visible = showTips, enter = fadeIn(), exit = fadeOut()) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                    modifier = Modifier.fillMaxWidth().clickable { showTips = false },
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Tip", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Toca una sugerencia para ir directo a Buscar.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+            Spacer(Modifier.height(8.dp))
+            Text("Top 20 en $selectedCountry", style = MaterialTheme.typography.headlineSmall)
+            TextButton(onClick = { showCountryPicker = true }) { Text("Cambiar país") }
+        }
+
+        items(countryTop20) { track ->
+            ListItem(
+                headlineContent = { Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                supportingContent = { Text(track.artist) },
+                modifier = Modifier.clickable { onQuickSearch("${track.title} ${track.artist}") }
+            )
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun CountryPickerDialog(onSelect: (String) -> Unit) {
+    val countries = listOf("México", "Argentina", "España", "Colombia", "Chile", "Estados Unidos")
+    AlertDialog(
+        onDismissRequest = {},
+        confirmButton = {},
+        title = { Text("Selecciona tu país") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                countries.forEach { country ->
+                    OutlinedButton(onClick = { onSelect(country) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(country)
                     }
                 }
             }
         }
+    )
+}
 
-        items(quickSearches) { q ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable { onQuickSearch(q) },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text(q, style = MaterialTheme.typography.titleMedium)
-                    Text("Búsqueda rápida", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-    }
+private fun buildCountryTop20(country: String): List<ChartTrack> {
+    val suffix = if (country.isBlank()) "Global" else country
+    return (1..20).map { idx -> ChartTrack("Top $idx - $suffix", "Artista $idx") }
+}
+
+private fun loadCountry(context: Context): String {
+    return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_COUNTRY, "") ?: ""
+}
+
+private fun saveCountry(context: Context, country: String) {
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_COUNTRY, country).apply()
 }
