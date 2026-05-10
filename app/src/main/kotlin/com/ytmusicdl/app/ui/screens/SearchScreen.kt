@@ -77,6 +77,11 @@ fun SearchScreen(
             },
         ) {}
         Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SuggestionChip(onClick = { doSearch(query) }, label = { Text("Buscar") })
+            SuggestionChip(onClick = { query = ""; results = emptyList() }, label = { Text("Limpiar") })
+        }
+        Spacer(Modifier.height(8.dp))
 
         when {
             loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }

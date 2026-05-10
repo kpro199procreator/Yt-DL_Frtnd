@@ -25,6 +25,7 @@ import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private sealed class UnifiedDownloadUiState {
@@ -55,7 +56,18 @@ fun DownloadScreen(track: Track, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 
+    LaunchedEffect(uiState) {
+        if (uiState is UnifiedDownloadUiState.Error) {
+            delay(10_000)
+            if (DownloadService.downloadState.value is DownloadState.Error) {
+                DownloadService.downloadState.value = DownloadState.Idle
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        AssistChip(onClick = {}, label = { Text("Descarga avanzada") })
+        Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
         }

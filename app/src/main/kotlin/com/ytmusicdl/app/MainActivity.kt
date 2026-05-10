@@ -49,7 +49,6 @@ fun App(pythonError: String? = null) {
     var seedQuery by remember { mutableStateOf("") }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("ytmusicdl") }) },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(selected = tab == AppTab.HOME, onClick = { tab = AppTab.HOME; selectedTrack = null }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Inicio") })

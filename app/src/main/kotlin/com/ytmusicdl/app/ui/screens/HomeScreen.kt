@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +40,12 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Inicio", style = MaterialTheme.typography.headlineMedium)
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Inicio", style = MaterialTheme.typography.headlineMedium)
+                    Text("Explora, busca y descarga.", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
             Text(
                 "Descubre música y comienza una búsqueda rápida.",
                 style = MaterialTheme.typography.bodyMedium,
