@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,16 +36,21 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Inicio", style = MaterialTheme.typography.headlineMedium)
+            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Inicio", style = MaterialTheme.typography.headlineMedium)
+                    Text("Explora, busca y descarga.", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
             Text(
                 "Descubre música y comienza una búsqueda rápida.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
         }
 
         item {
@@ -75,7 +78,7 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text(q, style = MaterialTheme.typography.titleMedium)
+                    Text(q, style = MaterialTheme.typography.titleLarge)
                     Text("Búsqueda rápida", style = MaterialTheme.typography.bodySmall)
                 }
             }
