@@ -99,6 +99,64 @@ object PythonBridge {
         }
     }
 
+    fun parsePlaylistTracks(json: String): PlaylistTracksResult {
+        if (json.isBlank() || json == "null") {
+            return PlaylistTracksResult(
+                playlist = PlaylistMeta("", "", "", 0),
+                tracks = emptyList(),
+            )
+        }
+        val obj = JSONObject(json)
+        val playlistObj = obj.optJSONObject("playlist") ?: JSONObject()
+        val tracksArr = obj.optJSONArray("tracks") ?: JSONArray()
+        val seen = HashSet<String>()
+        val tracks = buildList {
+            for (i in 0 until tracksArr.length()) {
+                val t = tracksArr.optJSONObject(i) ?: continue
+                val id = t.optString("videoId")
+                if (id.isBlank() || !seen.add(id)) continue
+                add(parseTrack(t))
+            }
+        }
+        return PlaylistTracksResult(
+            playlist = PlaylistMeta(
+                id = playlistObj.optString("id"),
+                title = playlistObj.optString("title"),
+                author = playlistObj.optString("author"),
+                trackCount = playlistObj.optInt("trackCount", tracks.size),
+            ),
+            tracks = tracks,
+        )
+    }
+
+    fun parseAlbumTracks(json: String): AlbumTracksResult {
+        if (json.isBlank() || json == "null") {
+            return AlbumTracksResult(AlbumMeta("", "", "", 0), emptyList(), false)
+        }
+        val obj = JSONObject(json)
+        val albumObj = obj.optJSONObject("album") ?: JSONObject()
+        val tracksArr = obj.optJSONArray("tracks") ?: JSONArray()
+        val seen = HashSet<String>()
+        val tracks = buildList {
+            for (i in 0 until tracksArr.length()) {
+                val t = tracksArr.optJSONObject(i) ?: continue
+                val id = t.optString("videoId")
+                if (id.isBlank() || !seen.add(id)) continue
+                add(parseTrack(t))
+            }
+        }
+        return AlbumTracksResult(
+            album = AlbumMeta(
+                id = albumObj.optString("id"),
+                title = albumObj.optString("title"),
+                year = albumObj.optString("year"),
+                trackCount = albumObj.optInt("trackCount", tracks.size),
+            ),
+            tracks = tracks,
+            exactMatch = obj.optBoolean("exactMatch", false),
+        )
+    }
+
     private fun parseTrack(obj: JSONObject) = com.ytmusicdl.app.data.model.Track(
         videoId = obj.optString("videoId"),
         title = obj.optString("title"),
