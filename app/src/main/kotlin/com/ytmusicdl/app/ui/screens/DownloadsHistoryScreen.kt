@@ -16,12 +16,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ytmusicdl.app.data.db.AppDatabase
+import com.ytmusicdl.app.data.db.DownloadHistoryCacheEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 private data class DownloadHistoryItem(
-    val file: File,
+    val filePath: String,
+    val title: String,
     val album: String,
     val duration: String,
     val coverBytes: ByteArray?,
@@ -29,28 +35,30 @@ private data class DownloadHistoryItem(
 
 @Composable
 fun DownloadsHistoryScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadHistoryItem>>(emptyList()) }
 
     LaunchedEffect(Unit) {
+        val dao = AppDatabase.get(context).historyCacheDao()
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "ytmusicdl")
         val files = dir.takeIf { it.exists() }?.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: emptyList()
-        items = files.map { file ->
-            val mmr = MediaMetadataRetriever()
-            try {
-                mmr.setDataSource(file.absolutePath)
-                val durationMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty().ifBlank { "Álbum desconocido" }
-                DownloadHistoryItem(
-                    file = file,
-                    album = album,
-                    duration = formatDuration(durationMs),
-                    coverBytes = mmr.embeddedPicture,
-                )
-            } catch (_: Exception) {
-                DownloadHistoryItem(file = file, album = "Álbum desconocido", duration = "--:--", coverBytes = null)
-            } finally {
-                mmr.release()
+
+        withContext(Dispatchers.IO) {
+            val cached = dao.getAll().associateBy { it.filePath }
+            val toUpsert = mutableListOf<DownloadHistoryCacheEntity>()
+            val result = files.map { file ->
+                val cache = cached[file.absolutePath]
+                if (cache != null && cache.lastModified == file.lastModified()) {
+                    cache.toUiItem()
+                } else {
+                    val refreshed = readMetadata(file)
+                    toUpsert.add(refreshed)
+                    refreshed.toUiItem()
+                }
             }
+            dao.deleteMissing(files.map { it.absolutePath })
+            if (toUpsert.isNotEmpty()) dao.upsertAll(toUpsert)
+            withContext(Dispatchers.Main) { items = result }
         }
     }
 
@@ -63,7 +71,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
             Text("Sin descargas aún", style = MaterialTheme.typography.bodyMedium)
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items, key = { it.file.absolutePath }) { item ->
+                items(items, key = { it.filePath }) { item ->
                     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -85,7 +93,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
                             }
 
                             Column(Modifier.weight(1f)) {
-                                Text(item.file.nameWithoutExtension, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("Álbum: ${item.album}", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("Duración: ${item.duration}", style = MaterialTheme.typography.bodySmall)
                             }
@@ -96,6 +104,37 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
         }
     }
 }
+
+private fun readMetadata(file: File): DownloadHistoryCacheEntity {
+    val mmr = MediaMetadataRetriever()
+    return try {
+        mmr.setDataSource(file.absolutePath)
+        val durationMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty().ifBlank { "Álbum desconocido" }
+        val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty().ifBlank { file.nameWithoutExtension }
+        DownloadHistoryCacheEntity(
+            filePath = file.absolutePath,
+            title = title,
+            album = album,
+            duration = formatDuration(durationMs),
+            coverBytes = mmr.embeddedPicture,
+            lastModified = file.lastModified(),
+        )
+    } catch (_: Exception) {
+        DownloadHistoryCacheEntity(
+            filePath = file.absolutePath,
+            title = file.nameWithoutExtension,
+            album = "Álbum desconocido",
+            duration = "--:--",
+            coverBytes = null,
+            lastModified = file.lastModified(),
+        )
+    } finally {
+        mmr.release()
+    }
+}
+
+private fun DownloadHistoryCacheEntity.toUiItem() = DownloadHistoryItem(filePath, title, album, duration, coverBytes)
 
 private fun formatDuration(durationMs: Long): String {
     if (durationMs <= 0L) return "--:--"
