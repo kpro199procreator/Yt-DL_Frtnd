@@ -15,6 +15,21 @@ CONTAINER_PRIORITY = {
 }
 
 
+BASE_YDL_OPTS = {
+    "quiet": True,
+    "skip_download": True,
+    "noplaylist": True,
+    "extractor_retries": 3,
+    "retries": 5,
+    "fragment_retries": 5,
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "web", "ios"],
+        }
+    },
+}
+
+
 def _track_from_search_item(item: dict) -> dict:
     artists = item.get("artists") or []
     artist_name = artists[0].get("name", "") if artists else ""
@@ -41,16 +56,30 @@ def _score_audio_format(fmt: dict) -> tuple:
     return abr, container_score, has_size, protocol_score
 
 
+def _extract_info_with_fallback(url: str):
+    # Prioriza comportamiento estilo: yt-dlp -f 140 <url>
+    format_attempts = [
+        "140",
+        "140/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+        "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
+    ]
+    last_error = None
+    for fmt in format_attempts:
+        opts = dict(BASE_YDL_OPTS)
+        opts["format"] = fmt
+        try:
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info:
+                return info, fmt
+        except Exception as e:
+            last_error = str(e)
+    raise RuntimeError(last_error or "No se pudo extraer información del video")
+
+
 def list_audio_formats(video_id):
     url = f"https://music.youtube.com/watch?v={video_id}"
-    opts = {
-        "quiet": True,
-        "skip_download": True,
-        "noplaylist": True,
-        "extractor_retries": 3,
-    }
-    with YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    info, used_fmt = _extract_info_with_fallback(url)
 
     available = []
     for fmt in info.get("formats") or []:
@@ -74,6 +103,25 @@ def list_audio_formats(video_id):
         available.append(normalized)
 
     if not available:
+        direct_url = info.get("url")
+        if direct_url:
+            selected = {
+                "format_id": str(info.get("format_id") or ""),
+                "ext": (info.get("ext") or "m4a").lower(),
+                "acodec": info.get("acodec") or "",
+                "abr": int(info.get("abr") or 0),
+                "asr": int(info.get("asr") or 0),
+                "filesize": int(info.get("filesize") or info.get("filesize_approx") or 0),
+                "protocol": info.get("protocol") or "",
+                "format_note": info.get("format_note") or "",
+                "url": direct_url,
+            }
+            return {
+                "formats": [selected],
+                "selected": selected,
+                "reason": f"Used direct extracted format with strategy '{used_fmt}'",
+                "info": info,
+            }
         return {
             "formats": [],
             "selected": None,
@@ -89,7 +137,7 @@ def list_audio_formats(video_id):
 
     reason = (
         f"Selected format_id={selected.get('format_id')} ext={selected.get('ext')} "
-        f"abr={selected.get('abr')}kbps using score priorities "
+        f"abr={selected.get('abr')}kbps using strategy '{used_fmt}' and score "
         "(abr > container compatibility > filesize/protocol)"
     )
 
