@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -18,6 +19,7 @@ import com.ytmusicdl.app.service.DownloadService
 
 @Composable
 fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
+    val context = LocalContext.current
     Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth()) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
@@ -32,9 +34,8 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
         if (track.year.isNotBlank()) Text(track.year, style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(26.dp))
         Button(
-            onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(androidx.compose.ui.platform.LocalContext.current, track) },
+            onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) },
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) { Text("Descargar cancion", style = MaterialTheme.typography.headlineSmall) }
     }
 }
-
