@@ -23,11 +23,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.ytmusicdl.app.data.api.PythonBridge
 import com.ytmusicdl.app.data.model.Track
-import com.ytmusicdl.app.ui.screens.DownloadScreen
+import com.ytmusicdl.app.ui.screens.AlbumDownloadScreen
 import com.ytmusicdl.app.ui.screens.DownloadsHistoryScreen
 import com.ytmusicdl.app.ui.screens.HomeScreen
 import com.ytmusicdl.app.ui.screens.SearchScreen
 import com.ytmusicdl.app.ui.screens.SettingsScreen
+import com.ytmusicdl.app.ui.screens.SongDownloadScreen
 import com.ytmusicdl.app.ui.theme.YtmusicdlTheme
 
 class MainActivity : ComponentActivity() {
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class AppTab { HOME, SEARCH, DOWNLOADS, SETTINGS }
+private enum class DetailMode { SONG, ALBUM }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +50,7 @@ fun App(pythonError: String? = null) {
     var showPythonError by remember(pythonError) { mutableStateOf(!pythonError.isNullOrBlank()) }
     var globalBackendError by remember { mutableStateOf<String?>(null) }
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
+    var detailMode by remember { mutableStateOf(DetailMode.SONG) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var seedQuery by remember { mutableStateOf("") }
 
@@ -73,12 +76,16 @@ fun App(pythonError: String? = null) {
         Box(Modifier.fillMaxSize().padding(padding)) {
             Crossfade(targetState = Pair(tab, selectedTrack), label = "tab") { (currentTab, currentTrack) ->
                 if (currentTrack != null) {
-                    DownloadScreen(track = currentTrack, onBack = { selectedTrack = null })
+                    when (detailMode) {
+                        DetailMode.SONG -> SongDownloadScreen(track = currentTrack, onBack = { selectedTrack = null })
+                        DetailMode.ALBUM -> AlbumDownloadScreen(track = currentTrack, onBack = { selectedTrack = null })
+                    }
                 } else {
                     when (currentTab) {
                         AppTab.HOME -> HomeScreen { seedQuery = it; tab = AppTab.SEARCH }
                         AppTab.SEARCH -> SearchScreen(
-                            onDownload = { selectedTrack = it },
+                            onOpenSong = { detailMode = DetailMode.SONG; selectedTrack = it },
+                            onOpenAlbum = { detailMode = DetailMode.ALBUM; selectedTrack = it },
                             onBack = { tab = AppTab.HOME },
                             initialQuery = seedQuery,
                             onGlobalBackendError = { globalBackendError = it },

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,6 +20,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
@@ -55,6 +57,11 @@ fun DownloadScreen(track: Track, onBack: () -> Unit) {
     val uiState = state.toUnifiedUiState()
     val scope = rememberCoroutineScope()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var albumMeta by remember { mutableStateOf("") }
+    var albumExactMatch by remember { mutableStateOf(false) }
+    var playlistInput by remember { mutableStateOf("") }
+    var playlistTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var playlistMeta by remember { mutableStateOf("") }
 
     LaunchedEffect(uiState) {
         if (uiState is UnifiedDownloadUiState.Error) {
@@ -96,7 +103,10 @@ fun DownloadScreen(track: Track, onBack: () -> Unit) {
             OutlinedButton(onClick = {
                 scope.launch {
                     albumTracks = ExtractorBackendProvider.backend.searchSongs("${track.artist} ${track.album}", 20)
-                        .filter { it.album.equals(track.album, ignoreCase = true) || it.artist.contains(track.artist, true) }
+                    val result = ExtractorBackendProvider.backend.getAlbumTracks(track.album, track.artist)
+                    albumTracks = result.tracks
+                    albumExactMatch = result.exactMatch
+                    albumMeta = "${result.album.title} · ${result.album.year} · ${result.album.trackCount} pistas"
                 }
             }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Download, null)
@@ -107,9 +117,69 @@ fun DownloadScreen(track: Track, onBack: () -> Unit) {
 
         if (albumTracks.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
+            if (albumMeta.isNotBlank()) Text(albumMeta, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = {
+                    albumTracks.forEach { item ->
+                        scope.launch { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }
+                    }
+                },
+                enabled = albumExactMatch,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Descargar álbum completo") }
+            Spacer(Modifier.height(8.dp))
             Text("Descargar pistas del álbum", style = MaterialTheme.typography.titleMedium)
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(albumTracks, key = { it.videoId }) { item ->
+                    ListItem(
+                        headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text(item.artist) },
+                        trailingContent = {
+                            IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
+                                Icon(Icons.Default.Download, null)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(
+            value = playlistInput,
+            onValueChange = { playlistInput = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Playlist ID o URL") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                scope.launch {
+                    val result = ExtractorBackendProvider.backend.getPlaylistTracks(playlistInput, 200)
+                    playlistTracks = result.tracks
+                    playlistMeta = "${result.playlist.title} · ${result.playlist.author} · ${result.playlist.trackCount} pistas"
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = playlistInput.isNotBlank(),
+        ) {
+            Icon(Icons.Default.Download, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Cargar playlist")
+        }
+
+        if (playlistMeta.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(playlistMeta, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (playlistTracks.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text("Descargar pistas de playlist", style = MaterialTheme.typography.titleMedium)
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(playlistTracks, key = { it.videoId }) { item ->
                     ListItem(
                         headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         supportingContent = { Text(item.artist) },
