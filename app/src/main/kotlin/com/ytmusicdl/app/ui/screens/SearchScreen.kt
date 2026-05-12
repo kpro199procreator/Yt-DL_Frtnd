@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    onDownload: (Track) -> Unit,
+    onOpenSong: (Track) -> Unit,
+    onOpenAlbum: (Track) -> Unit,
     onBack: () -> Unit,
     initialQuery: String = "",
     onGlobalBackendError: (String) -> Unit = {},
@@ -78,8 +79,8 @@ fun SearchScreen(
         ) {}
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SuggestionChip(onClick = { doSearch(query) }, label = { Text("Buscar") })
-            SuggestionChip(onClick = { query = ""; results = emptyList() }, label = { Text("Limpiar") })
+            SuggestionChip(onClick = { results.firstOrNull()?.let(onOpenAlbum) }, label = { Text("Album") })
+            SuggestionChip(onClick = { results.firstOrNull()?.let(onOpenSong) }, label = { Text("Song") })
         }
         Spacer(Modifier.height(8.dp))
 
@@ -105,8 +106,8 @@ fun SearchScreen(
                         leadingContent = {
                             AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small))
                         },
-                        trailingContent = { IconButton(onClick = { onDownload(track) }) { Icon(Icons.Default.Download, null) } },
-                        modifier = Modifier.clickable { onDownload(track) },
+                        trailingContent = { IconButton(onClick = { onOpenSong(track) }) { Icon(Icons.Default.Download, null) } },
+                        modifier = Modifier.clickable { onOpenSong(track) },
                     )
                 }
             }
