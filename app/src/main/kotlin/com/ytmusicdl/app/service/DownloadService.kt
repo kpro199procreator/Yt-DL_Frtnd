@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
+import com.ytmusicdl.app.data.SettingsPrefs
 import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
@@ -18,11 +19,13 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Servicio de descarga en foreground.
  * Flujo:
- *   1. NewPipe extrae la URL de audio del video
+ *   1. El backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
  *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
@@ -37,6 +40,7 @@ class DownloadService : Service() {
 
         // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+        @Volatile private var limiter: Semaphore? = null
 
         fun start(context: Context, track: Track) {
             val intent = Intent(context, DownloadService::class.java).apply {
@@ -88,8 +92,10 @@ class DownloadService : Service() {
     }
 
     private suspend fun downloadTrack(track: Track) {
+        val sem = limiter ?: Semaphore(SettingsPrefs.maxConcurrent(applicationContext)).also { limiter = it }
+        sem.withPermit {
         try {
-            // 1. Extraer URL de audio con NewPipe
+            // 1. Extraer URL de audio
             downloadState.value = DownloadState.FetchingStream
             updateNotification("Obteniendo stream…", 0)
 
@@ -133,12 +139,10 @@ class DownloadService : Service() {
             writeTags(finalFile, enrichedTrack)
 
             // 5. Mover a carpeta de música
-            val outputDir  = File(
-                android.os.Environment.getExternalStoragePublicDirectory(
-                    android.os.Environment.DIRECTORY_MUSIC
-                ), "ytmusicdl"
-            ).also { it.mkdirs() }
-            val outputFile = File(outputDir, sanitize("${enrichedTrack.artist} - ${enrichedTrack.title}.m4a"))
+            val configuredPath = SettingsPrefs.downloadPath(applicationContext).trim().ifBlank { "/Music/ytmusicdl" }
+            val outputDir = File(android.os.Environment.getExternalStorageDirectory(), configuredPath.removePrefix("/")).also { it.mkdirs() }
+            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".m4a"
+            val outputFile = File(outputDir, sanitize(outputName))
             finalFile.copyTo(outputFile, overwrite = true)
             tempFile.delete()
             finalFile.delete()
@@ -157,6 +161,7 @@ class DownloadService : Service() {
         } finally {
             delay(3000)
             stopSelf()
+        }
         }
     }
 
@@ -269,6 +274,14 @@ class DownloadService : Service() {
 
     private fun sanitize(name: String) =
         name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+
+    private fun applyTemplate(template: String, track: Track): String {
+        return template
+            .replace("{album}", track.album.ifBlank { "Unknown Album" })
+            .replace("{track}", track.title.ifBlank { "Unknown Track" })
+            .replace("{year}", track.year.ifBlank { "0000" })
+            .replace("{artist}", track.artist.ifBlank { "Unknown Artist" })
+    }
 
     // ── Notificaciones ────────────────────────────────────────────────────────
 

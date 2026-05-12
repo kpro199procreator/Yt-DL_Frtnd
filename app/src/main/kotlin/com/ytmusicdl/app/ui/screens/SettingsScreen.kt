@@ -10,13 +10,18 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.ytmusicdl.app.data.SettingsPrefs
 
 @Composable
 fun SettingsScreen() {
+    val context = LocalContext.current
     var darkMode by remember { mutableStateOf(false) }
     var dynamicColor by remember { mutableStateOf(true) }
-    var downloadPath by remember { mutableStateOf("/Music/ytmusicdl") }
+    var downloadPath by remember { mutableStateOf(SettingsPrefs.downloadPath(context)) }
+    var filenameTemplate by remember { mutableStateOf(SettingsPrefs.filenameTemplate(context)) }
+    var maxConcurrent by remember { mutableStateOf(SettingsPrefs.maxConcurrent(context).toFloat()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -41,7 +46,25 @@ fun SettingsScreen() {
                         singleLine = true,
                         placeholder = { Text("/Music/ytmusicdl") },
                     )
-                    Text("(Placeholder) Persistencia de ruta en próxima versión", style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = filenameTemplate,
+                        onValueChange = { filenameTemplate = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Template de nombre") },
+                        placeholder = { Text("{artist} - {track} ({year}) [{album}]") },
+                    )
+                    Text("Variables: {album} {track} {year} {artist}", style = MaterialTheme.typography.bodySmall)
+                    Text("Descargas simultáneas: ${maxConcurrent.toInt()}", style = MaterialTheme.typography.bodyMedium)
+                    Slider(
+                        value = maxConcurrent,
+                        onValueChange = { maxConcurrent = it },
+                        valueRange = 1f..15f,
+                        steps = 13,
+                    )
+                    Button(onClick = { SettingsPrefs.save(context, downloadPath, filenameTemplate, maxConcurrent.toInt()) }) {
+                        Text("Guardar")
+                    }
                 }
             }
         }
