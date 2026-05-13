@@ -3,6 +3,7 @@ package com.ytmusicdl.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
@@ -25,6 +26,7 @@ import kotlinx.coroutines.launch
 fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val queue by DownloadService.queueState.collectAsState()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
     var meta by remember { mutableStateOf("") }
     var exact by remember { mutableStateOf(false) }
@@ -64,16 +66,18 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(albumTracks, key = { it.videoId }) { item ->
+                val q = queue.firstOrNull { it.videoId == item.videoId }
                 ListItem(
                     headlineContent = { Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    supportingContent = { Text(q?.status ?: "pending") },
                     trailingContent = {
                         IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
                             Icon(Icons.Default.Download, contentDescription = null)
                         }
-                    }
+                    },
+                    modifier = Modifier.clickable { DownloadService.start(context, item) }
                 )
             }
         }
     }
 }
-

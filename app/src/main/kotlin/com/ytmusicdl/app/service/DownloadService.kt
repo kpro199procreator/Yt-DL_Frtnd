@@ -14,6 +14,7 @@ import com.ytmusicdl.app.data.model.Track
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -32,6 +33,7 @@ import kotlinx.coroutines.sync.withPermit
  *   5. Guarda en ~/Music en almacenamiento externo
  */
 class DownloadService : Service() {
+    data class QueueItem(val videoId: String, val title: String, val album: String, val progress: Int = 0, val status: String = "queued")
 
     companion object {
         const val CHANNEL_ID    = "ytmusicdl_downloads"
@@ -40,9 +42,11 @@ class DownloadService : Service() {
 
         // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+        val queueState = MutableStateFlow<List<QueueItem>>(emptyList())
         @Volatile private var limiter: Semaphore? = null
 
         fun start(context: Context, track: Track) {
+            queueState.update { it + QueueItem(track.videoId, track.title, track.album, 0, "queued") }
             val intent = Intent(context, DownloadService::class.java).apply {
                 putExtra(EXTRA_TRACK_TITLE,  track.title)
                 putExtra(EXTRA_TRACK_ARTIST, track.artist)
@@ -86,18 +90,21 @@ class DownloadService : Service() {
             year     = intent.getStringExtra(EXTRA_TRACK_YEAR)    ?: "",
             duration = intent.getStringExtra(EXTRA_TRACK_DUR)     ?: "",
         )
-        startForeground(NOTIF_ID, buildNotification("Preparando descarga…", 0))
+        val notifId = (track.videoId.hashCode() and 0x7fffffff) % 100000 + 1000
+        startForeground(notifId, buildNotification("Preparando descarga…", 0))
         scope.launch { downloadTrack(track) }
         return START_NOT_STICKY
     }
 
     private suspend fun downloadTrack(track: Track) {
+        val notifId = (track.videoId.hashCode() and 0x7fffffff) % 100000 + 1000
         val sem = limiter ?: Semaphore(SettingsPrefs.maxConcurrent(applicationContext)).also { limiter = it }
         sem.withPermit {
         try {
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "downloading") else it } }
             // 1. Extraer URL de audio
             downloadState.value = DownloadState.FetchingStream
-            updateNotification("Obteniendo stream…", 0)
+            updateNotification(notifId, "Obteniendo stream…", 0)
 
             val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId)
                 ?: run {
@@ -112,7 +119,7 @@ class DownloadService : Service() {
                 stopSelf(); return
             }
             val qualityLabel = buildQualityLabel(extraction)
-            updateNotification("Formato elegido: $qualityLabel", 0)
+            updateNotification(notifId, "Formato elegido: $qualityLabel", 0)
 
             val enrichedTrack = track.copy(
                 title = track.title.ifBlank { extraction.title },
@@ -125,17 +132,18 @@ class DownloadService : Service() {
             val tempFile = File(cacheDir, "${track.videoId}_temp.$ext")
             downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal ->
                 downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
-                updateNotification("Descargando $qualityLabel", progress)
+                queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = progress, status = "downloading") else it } }
+                updateNotification(notifId, "Descargando $qualityLabel", progress)
             }
 
             // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
             downloadState.value = DownloadState.Converting
-            updateNotification("Procesando $qualityLabel…", 100)
+            updateNotification(notifId, "Procesando $qualityLabel…", 100)
             val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
 
             // 4. Escribir tags
             downloadState.value = DownloadState.WritingTags
-            updateNotification("Escribiendo metadata…", 100)
+            updateNotification(notifId, "Escribiendo metadata…", 100)
             writeTags(finalFile, enrichedTrack)
 
             // 5. Mover a carpeta de música
@@ -153,14 +161,17 @@ class DownloadService : Service() {
             )
 
             downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            updateNotification("✓ ${enrichedTrack.title} descargado ($qualityLabel)", 100)
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = 100, status = "done") else it } }
+            updateNotification(notifId, "✓ ${enrichedTrack.title} descargado ($qualityLabel)", 100)
 
         } catch (e: Exception) {
             downloadState.value = DownloadState.Error(e.message ?: "Error desconocido")
-            updateNotification("Error: ${e.message}", 0)
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "error") else it } }
+            updateNotification(notifId, "Error: ${e.message}", 0)
         } finally {
-            delay(3000)
-            stopSelf()
+            delay(1500)
+            val pending = queueState.value.any { it.status == "queued" || it.status == "downloading" }
+            if (!pending) stopSelf()
         }
         }
     }
@@ -304,10 +315,10 @@ class DownloadService : Service() {
             .build()
     }
 
-    private fun updateNotification(text: String, progress: Int) {
+    private fun updateNotification(notifId: Int, text: String, progress: Int) {
         val notif = buildNotification(text, progress)
         getSystemService(NotificationManager::class.java)
-            .notify(NOTIF_ID, notif)
+            .notify(notifId, notif)
     }
 
     override fun onBind(intent: Intent?) = null

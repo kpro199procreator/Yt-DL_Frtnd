@@ -22,7 +22,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ytmusicdl.app.data.db.AppDatabase
 import com.ytmusicdl.app.data.db.DownloadHistoryCacheEntity
-import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.service.DownloadService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,7 +40,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadHistoryItem>>(emptyList()) }
     var showHistory by remember { mutableStateOf(false) }
-    val downloadState by DownloadService.downloadState.collectAsState()
+    val queue by DownloadService.queueState.collectAsState()
 
     LaunchedEffect(Unit) {
         val dao = AppDatabase.get(context).historyCacheDao()
@@ -74,16 +73,17 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
         }
         Text("Descargas", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(10.dp))
-        when (val s = downloadState) {
-            DownloadState.Idle -> Text("No se está descargando nada aún")
-            is DownloadState.Downloading -> ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("progress: Descargando ${s.progress}%")
-                    LinearProgressIndicator(progress = { s.progress / 100f }, modifier = Modifier.fillMaxWidth())
-                    Text("${"%.2f".format(s.mbDone)}MB / ${"%.2f".format(s.mbTotal)}MB")
+        Text("Progreso y cola actual", style = MaterialTheme.typography.titleMedium)
+        if (queue.isEmpty()) Text("Sin elementos en cola.")
+        queue.forEach { q ->
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(10.dp)) {
+                    Text("${q.title} · ${if (q.album.isBlank()) "song" else "album/song"}")
+                    Text("Estado: ${q.status}")
+                    LinearProgressIndicator(progress = { q.progress / 100f }, modifier = Modifier.fillMaxWidth())
                 }
             }
-            else -> Text("progress: Descargando song/álbum…")
+            Spacer(Modifier.height(6.dp))
         }
         Spacer(Modifier.height(10.dp))
 
