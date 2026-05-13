@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -15,11 +16,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.ytmusicdl.app.data.api.PythonBridge
+import com.ytmusicdl.app.data.model.Track
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val PREFS_NAME = "ytmusicdl_prefs"
 private const val KEY_COUNTRY = "selected_country"
-
-private data class ChartTrack(val title: String, val artist: String)
 
 @Composable
 fun HomeScreen(onQuickSearch: (String) -> Unit) {
@@ -37,22 +40,14 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
         )
     }
 
-    val globalTop10 = remember {
-        listOf(
-            ChartTrack("Blinding Lights", "The Weeknd"),
-            ChartTrack("Shape of You", "Ed Sheeran"),
-            ChartTrack("As It Was", "Harry Styles"),
-            ChartTrack("bad guy", "Billie Eilish"),
-            ChartTrack("Levitating", "Dua Lipa"),
-            ChartTrack("One Dance", "Drake"),
-            ChartTrack("Stay", "The Kid LAROI"),
-            ChartTrack("Someone You Loved", "Lewis Capaldi"),
-            ChartTrack("Sunflower", "Post Malone"),
-            ChartTrack("Señorita", "Shawn Mendes & Camila Cabello"),
-        )
+    var globalTop10 by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var countryTop20 by remember(selectedCountry) { mutableStateOf<List<Track>>(emptyList()) }
+    LaunchedEffect(selectedCountry) {
+        withContext(Dispatchers.IO) {
+            runCatching { PythonBridge.parseTrackList(PythonBridge.call("get_top_world", 10)) }.getOrNull()?.let { globalTop10 = it }
+            runCatching { PythonBridge.parseTrackList(PythonBridge.call("get_top_region", selectedCountry, 20)) }.getOrNull()?.let { countryTop20 = it }
+        }
     }
-
-    val countryTop20 = remember(selectedCountry) { buildCountryTop20(selectedCountry) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -64,7 +59,9 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
             Text("Listado global", style = MaterialTheme.typography.bodyMedium)
         }
 
-        items(globalTop10) { track ->
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(globalTop10, key = { it.videoId }) { track ->
             ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onQuickSearch("${track.title} ${track.artist}") }) {
                 Row(Modifier.padding(12.dp)) {
                     AsyncImage(
@@ -78,6 +75,8 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
                     Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(track.artist, style = MaterialTheme.typography.bodySmall)
                     }
+                }
+            }
                 }
             }
         }
@@ -99,8 +98,8 @@ fun HomeScreen(onQuickSearch: (String) -> Unit) {
                     )
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist, style = MaterialTheme.typography.bodySmall)
+                        Text(track.title.ifBlank { "Cargando..." }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist.ifBlank { "Artista" }, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -127,10 +126,6 @@ private fun CountryPickerDialog(onSelect: (String) -> Unit) {
     )
 }
 
-private fun buildCountryTop20(country: String): List<ChartTrack> {
-    val suffix = if (country.isBlank()) "Global" else country
-    return (1..20).map { idx -> ChartTrack("Top $idx - $suffix", "Artista $idx") }
-}
 
 private fun loadCountry(context: Context): String {
     return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_COUNTRY, "") ?: ""

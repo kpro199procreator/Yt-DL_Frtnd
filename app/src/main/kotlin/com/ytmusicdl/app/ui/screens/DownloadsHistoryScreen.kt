@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ytmusicdl.app.data.db.AppDatabase
 import com.ytmusicdl.app.data.db.DownloadHistoryCacheEntity
+import com.ytmusicdl.app.data.model.DownloadState
+import com.ytmusicdl.app.service.DownloadService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -37,6 +40,8 @@ private data class DownloadHistoryItem(
 fun DownloadsHistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadHistoryItem>>(emptyList()) }
+    var showHistory by remember { mutableStateOf(false) }
+    val downloadState by DownloadService.downloadState.collectAsState()
 
     LaunchedEffect(Unit) {
         val dao = AppDatabase.get(context).historyCacheDao()
@@ -63,11 +68,28 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
+            IconButton(onClick = { showHistory = !showHistory }) { Icon(Icons.Default.History, contentDescription = "Historial") }
+        }
         Text("Descargas", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(10.dp))
+        when (val s = downloadState) {
+            DownloadState.Idle -> Text("No se está descargando nada aún")
+            is DownloadState.Downloading -> ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("progress: Descargando ${s.progress}%")
+                    LinearProgressIndicator(progress = { s.progress / 100f }, modifier = Modifier.fillMaxWidth())
+                    Text("${"%.2f".format(s.mbDone)}MB / ${"%.2f".format(s.mbTotal)}MB")
+                }
+            }
+            else -> Text("progress: Descargando song/álbum…")
+        }
+        Spacer(Modifier.height(10.dp))
 
-        if (items.isEmpty()) {
+        if (!showHistory) {
+            Text("Pulsa historial para ver descargas previas.")
+        } else if (items.isEmpty()) {
             Text("Sin descargas aún", style = MaterialTheme.typography.bodyMedium)
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {

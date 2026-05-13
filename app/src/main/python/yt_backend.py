@@ -4,6 +4,7 @@ from yt_dlp import YoutubeDL
 from yt_common import search_tracks, get_music_metadata, get_lyrics
 from yt_albums import get_album_tracks
 from yt_playlists import get_playlist_tracks
+from yt_tops import get_top_world, get_top_region
 
 CONTAINER_PRIORITY = {
     "m4a": 3,
