@@ -30,6 +30,16 @@ object EmbeddedPythonBackend : ExtractorBackend {
         val result = PythonBridge.call("get_lyrics", title, artist)
         result.takeIf { it.isNotBlank() && it != "null" }
     }
+
+    override suspend fun getPlaylistTracks(playlistIdOrUrl: String, limit: Int): PlaylistTracksResult = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("get_playlist_tracks", playlistIdOrUrl, limit)
+        PythonBridge.parsePlaylistTracks(json)
+    }
+
+    override suspend fun getAlbumTracks(albumIdOrName: String, artist: String): AlbumTracksResult = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("get_album_tracks", albumIdOrName, artist)
+        PythonBridge.parseAlbumTracks(json)
+    }
 }
 
 object ExtractorBackendProvider {
