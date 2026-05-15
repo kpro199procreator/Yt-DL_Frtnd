@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
 import com.ytmusicdl.app.data.SettingsPrefs
-import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
@@ -28,7 +27,7 @@ import kotlinx.coroutines.sync.withPermit
  * Flujo:
  *   1. El backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
- *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
+ *   3. Mantiene contenedor de origen (sin conversión FFmpeg)
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
  *   5. Guarda en ~/Music en almacenamiento externo
  */
@@ -38,9 +37,7 @@ class DownloadService : Service() {
     companion object {
         const val CHANNEL_ID    = "ytmusicdl_downloads"
         const val NOTIF_ID      = 1001
-        const val EXTRA_TRACK   = "track"
-
-        // StateFlow compartido para que la UI observe el estado
+                // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
         val queueState = MutableStateFlow<List<QueueItem>>(emptyList())
         @Volatile private var limiter: Semaphore? = null
@@ -136,10 +133,8 @@ class DownloadService : Service() {
                 updateNotification(notifId, "Descargando $qualityLabel", progress)
             }
 
-            // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
-            downloadState.value = DownloadState.Converting
-            updateNotification(notifId, "Procesando $qualityLabel…", 100)
-            val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
+            // 3. Sin conversión FFmpeg: se conserva el archivo descargado
+            val finalFile = tempFile
 
             // 4. Escribir tags
             downloadState.value = DownloadState.WritingTags
@@ -149,7 +144,7 @@ class DownloadService : Service() {
             // 5. Mover a carpeta de música
             val configuredPath = SettingsPrefs.downloadPath(applicationContext).trim().ifBlank { "/Music/ytmusicdl" }
             val outputDir = File(android.os.Environment.getExternalStorageDirectory(), configuredPath.removePrefix("/")).also { it.mkdirs() }
-            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".m4a"
+            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".${ext.ifBlank { "m4a" }}"
             val outputFile = File(outputDir, sanitize(outputName))
             finalFile.copyTo(outputFile, overwrite = true)
             tempFile.delete()
@@ -216,22 +211,6 @@ class DownloadService : Service() {
         }
     }
 
-    private suspend fun convertIfNeeded(input: File, track: Track, ext: String): File =
-        withContext(Dispatchers.IO) {
-            if (ext == "m4a") return@withContext input
-
-            // webm/opus → m4a con mobile-ffmpeg
-            val output = File(cacheDir, "${track.videoId}.m4a")
-            val rc = FFmpeg.execute(
-                "-i \"${input.absolutePath}\" -c:a aac -b:a 256k -vn \"${output.absolutePath}\""
-            )
-            if (rc != 0) {
-                // Si ffmpeg falla, devolver el archivo original sin convertir
-                return@withContext input
-            }
-            output
-        }
-
     private suspend fun writeTags(file: File, track: Track) = withContext(Dispatchers.IO) {
         try {
             val audioFile = org.jaudiotagger.audio.AudioFileIO.read(file)
@@ -249,10 +228,10 @@ class DownloadService : Service() {
                 try {
                     val coverBytes = fetchBytes(track.coverUrl)
                     if (coverBytes != null) {
-                        val artwork = org.jaudiotagger.tag.images.ArtworkFactory
-                            .createArtworkFromFile(file)
+                        val artwork = org.jaudiotagger.tag.images.StandardArtwork()
                         artwork.binaryData = coverBytes
-                        artwork.mimeType   = "image/jpeg"
+                        artwork.mimeType = "image/jpeg"
+                        tag.deleteArtworkField()
                         tag.setField(artwork)
                     }
                 } catch (_: Exception) {}

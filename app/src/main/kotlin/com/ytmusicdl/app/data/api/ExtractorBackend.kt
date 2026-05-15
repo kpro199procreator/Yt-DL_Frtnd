@@ -13,8 +13,15 @@ data class AudioFormatOption(
     val formatNote: String,
 )
 
+data class SearchBundle(
+    val songs: List<Track>,
+    val albums: List<Track>,
+    val playlists: List<Track>,
+)
+
 interface ExtractorBackend {
     suspend fun searchSongs(query: String, limit: Int = 8): List<Track>
+    suspend fun searchAll(query: String, limit: Int = 24): SearchBundle
     suspend fun listAudioFormats(videoId: String): List<AudioFormatOption>
     suspend fun extractAudio(videoId: String, preferredFormatId: String? = null): AudioExtractionResult?
     suspend fun getTrackInfo(videoIdOrQuery: String): Track?
