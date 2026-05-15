@@ -6,7 +6,7 @@ import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
 import com.ytmusicdl.app.data.SettingsPrefs
-import com.arthenica.mobileffmpeg.FFmpeg
+import com.arthenica.ffmpegkit.FFmpegKit
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
@@ -38,9 +38,7 @@ class DownloadService : Service() {
     companion object {
         const val CHANNEL_ID    = "ytmusicdl_downloads"
         const val NOTIF_ID      = 1001
-        const val EXTRA_TRACK   = "track"
-
-        // StateFlow compartido para que la UI observe el estado
+                // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
         val queueState = MutableStateFlow<List<QueueItem>>(emptyList())
         @Volatile private var limiter: Semaphore? = null
@@ -222,10 +220,10 @@ class DownloadService : Service() {
 
             // webm/opus → m4a con mobile-ffmpeg
             val output = File(cacheDir, "${track.videoId}.m4a")
-            val rc = FFmpeg.execute(
+            val session = FFmpegKit.execute(
                 "-i \"${input.absolutePath}\" -c:a aac -b:a 256k -vn \"${output.absolutePath}\""
             )
-            if (rc != 0) {
+            if (session.returnCode.value != 0) {
                 // Si ffmpeg falla, devolver el archivo original sin convertir
                 return@withContext input
             }
@@ -249,10 +247,10 @@ class DownloadService : Service() {
                 try {
                     val coverBytes = fetchBytes(track.coverUrl)
                     if (coverBytes != null) {
-                        val artwork = org.jaudiotagger.tag.images.ArtworkFactory
-                            .createArtworkFromFile(file)
+                        val artwork = org.jaudiotagger.tag.images.StandardArtwork()
                         artwork.binaryData = coverBytes
-                        artwork.mimeType   = "image/jpeg"
+                        artwork.mimeType = "image/jpeg"
+                        tag.deleteArtworkField()
                         tag.setField(artwork)
                     }
                 } catch (_: Exception) {}
