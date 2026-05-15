@@ -76,7 +76,8 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(20.dp))
-        Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, modifier = Modifier.fillMaxWidth().height(54.dp)) {
+        val canStart = task?.status != "downloading" && task?.status != "queued"
+        Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, enabled = canStart, modifier = Modifier.fillMaxWidth().height(54.dp)) {
             Icon(Icons.Default.Download, null)
             Spacer(Modifier.width(8.dp))
             Text("Descargar")
