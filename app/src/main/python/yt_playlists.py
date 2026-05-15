@@ -1,5 +1,6 @@
 import json
 from ytmusicapi import YTMusic
+from yt_common import upgrade_thumbnail_url
 
 _ytmusic = YTMusic()
 
@@ -16,7 +17,7 @@ def _track_from_playlist_item(item: dict) -> dict:
     return {
         "videoId": item.get("videoId", ""), "title": item.get("title", ""), "artist": artist_name,
         "album": (item.get("album") or {}).get("name", ""), "year": str(item.get("year", "") or ""),
-        "coverUrl": thumbs[-1]["url"] if thumbs else "", "duration": item.get("duration", ""), "streamUrl": "",
+        "coverUrl": upgrade_thumbnail_url(thumbs[-1]["url"]) if thumbs else "", "duration": item.get("duration", ""), "streamUrl": "",
     }
 
 def get_playlist_tracks(playlist_id_or_url, limit=200):

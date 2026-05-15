@@ -1,7 +1,7 @@
 import json
 from yt_dlp import YoutubeDL
 
-from yt_common import search_tracks, get_music_metadata, get_lyrics
+from yt_common import search_tracks, search_all, get_music_metadata, get_lyrics, upgrade_thumbnail_url
 from yt_albums import get_album_tracks
 from yt_playlists import get_playlist_tracks
 from yt_tops import get_top_world, get_top_region
@@ -78,4 +78,4 @@ def extract_audio(video_id, preferred_format_id="140"):
         pref = str(preferred_format_id)
         preferred = next((f for f in decision.get("formats", []) if f.get("format_id") == pref), None)
         if preferred: selected = preferred
-    return json.dumps({"audioUrl": selected.get("url", ""),"containerExt": selected.get("ext", "m4a"),"bitrate": int(selected.get("abr") or 0),"artist": info.get("uploader", ""),"title": info.get("title", ""),"coverUrl": info.get("thumbnail", ""),"selectedFormatId": selected.get("format_id", ""),"selectedAudioCodec": selected.get("acodec", ""),"selectedSampleRate": int(selected.get("asr") or 0),"selectedProtocol": selected.get("protocol", ""),"selectedFormatNote": selected.get("format_note", ""),"selectedFileSize": int(selected.get("filesize") or 0),"selectionReason": decision.get("reason", ""),"availableFormats": decision.get("formats", [])})
+    return json.dumps({"audioUrl": selected.get("url", ""),"containerExt": selected.get("ext", "m4a"),"bitrate": int(selected.get("abr") or 0),"artist": info.get("uploader", ""),"title": info.get("title", ""),"coverUrl": upgrade_thumbnail_url(info.get("thumbnail", "")),"selectedFormatId": selected.get("format_id", ""),"selectedAudioCodec": selected.get("acodec", ""),"selectedSampleRate": int(selected.get("asr") or 0),"selectedProtocol": selected.get("protocol", ""),"selectedFormatNote": selected.get("format_note", ""),"selectedFileSize": int(selected.get("filesize") or 0),"selectionReason": decision.get("reason", ""),"availableFormats": decision.get("formats", [])})

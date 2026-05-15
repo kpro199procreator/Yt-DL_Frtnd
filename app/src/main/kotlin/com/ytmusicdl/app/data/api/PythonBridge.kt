@@ -99,6 +99,26 @@ object PythonBridge {
         }
     }
 
+
+    fun parseSearchBundle(json: String): SearchBundle {
+        if (json.isBlank() || json == "null") return SearchBundle(emptyList(), emptyList(), emptyList())
+        val obj = JSONObject(json)
+        fun arrToTracks(name: String): List<com.ytmusicdl.app.data.model.Track> {
+            val arr = obj.optJSONArray(name) ?: JSONArray()
+            return buildList {
+                for (i in 0 until arr.length()) {
+                    val t = arr.optJSONObject(i) ?: continue
+                    add(parseTrack(t))
+                }
+            }
+        }
+        return SearchBundle(
+            songs = arrToTracks("songs"),
+            albums = arrToTracks("albums"),
+            playlists = arrToTracks("playlists"),
+        )
+    }
+
     fun parsePlaylistTracks(json: String): PlaylistTracksResult {
         if (json.isBlank() || json == "null") {
             return PlaylistTracksResult(
