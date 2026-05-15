@@ -1,5 +1,6 @@
 package com.ytmusicdl.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,7 +45,7 @@ fun SearchScreen(
         if (q.isBlank()) return
         searchJob?.cancel()
         searchJob = scope.launch {
-            delay(250)
+            delay(220)
             loading = true
             error = null
             try {
@@ -62,7 +63,8 @@ fun SearchScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
         IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
-        Text("Buscar música", style = MaterialTheme.typography.headlineMedium)
+        Text("Search", style = MaterialTheme.typography.headlineMedium)
+        Text("Buscar canciones, álbumes, playlists o pegar URL", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
         SearchBar(
             query = query,
@@ -71,7 +73,7 @@ fun SearchScreen(
             active = false,
             onActiveChange = {},
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Buscar en YouTube Music…") },
+            placeholder = { Text("Search o URL") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
                 if (query.isNotEmpty()) IconButton({ query = ""; results = emptyList(); error = null }) { Icon(Icons.Default.Close, null) }
@@ -79,38 +81,51 @@ fun SearchScreen(
         ) {}
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SuggestionChip(onClick = { results.firstOrNull()?.let(onOpenAlbum) }, label = { Text("Album") })
-            SuggestionChip(onClick = { results.firstOrNull()?.let(onOpenSong) }, label = { Text("Song") })
+            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Songs") })
+            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Albums") })
+            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Playlists") })
         }
         Spacer(Modifier.height(8.dp))
 
         when {
-            loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            error != null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
-                Text(error ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-            }
-            results.isEmpty() && query.isNotEmpty() -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
-                Text("Sin resultados", color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
-            }
-            else -> LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items(results, key = { it.videoId }, contentType = { "track" }) { track ->
-                    ListItem(
-                        headlineContent = { Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
-                        supportingContent = {
-                            Text(buildString {
-                                append(track.artist)
-                                if (track.album.isNotEmpty()) append(" · ${track.album}")
-                                if (track.duration.isNotEmpty()) append(" · ${track.duration}")
-                            }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                        },
-                        leadingContent = {
-                            AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small))
-                        },
-                        trailingContent = { IconButton(onClick = { onOpenSong(track) }) { Icon(Icons.Default.Download, null) } },
-                        modifier = Modifier.clickable { onOpenSong(track) },
-                    )
+            loading -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(6) {
+                    ElevatedCard(Modifier.fillMaxWidth().height(68.dp)) {}
                 }
             }
+            error != null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(error ?: "", color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { doSearch(query) }) { Text("Retry") }
+                }
+            }
+            results.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
+                Text(if (query.isBlank()) "Busca o pega una URL para comenzar" else "Sin resultados")
+            }
+            else -> LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(results, key = { it.videoId }, contentType = { "track" }) { track ->
+                    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onOpenSong(track) }) {
+                        ListItem(
+                            headlineContent = { Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
+                            supportingContent = {
+                                Text("${track.artist.ifBlank { "Unknown" }} · ${track.duration.ifBlank { "--:--" }}", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                            },
+                            leadingContent = {
+                                AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small))
+                            },
+                            trailingContent = {
+                                Row {
+                                    IconButton(onClick = { onOpenAlbum(track) }) { Text("A") }
+                                    IconButton(onClick = { onOpenSong(track) }) { Icon(Icons.Default.Download, null) }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        AnimatedVisibility(visible = results.isNotEmpty()) {
+            Text("${results.size} resultados", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
