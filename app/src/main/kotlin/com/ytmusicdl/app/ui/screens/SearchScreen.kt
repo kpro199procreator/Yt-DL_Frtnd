@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,10 +43,15 @@ fun SearchScreen(
     val scope = rememberCoroutineScope()
 
     fun doSearch(q: String) {
-        if (q.isBlank()) return
+        if (q.isBlank()) {
+            loading = false
+            results = emptyList()
+            error = null
+            return
+        }
         searchJob?.cancel()
         searchJob = scope.launch {
-            delay(220)
+            delay(250)
             loading = true
             error = null
             try {
@@ -61,10 +67,12 @@ fun SearchScreen(
         }
     }
 
+    LaunchedEffect(query) { doSearch(query.trim()) }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp)) {
         IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
         Text("Search", style = MaterialTheme.typography.headlineMedium)
-        Text("Buscar canciones, álbumes, playlists o pegar URL", style = MaterialTheme.typography.bodySmall)
+        Text("Búsqueda en tiempo real: canciones, álbumes, playlists o URL", style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
         SearchBar(
             query = query,
@@ -73,26 +81,14 @@ fun SearchScreen(
             active = false,
             onActiveChange = {},
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search o URL") },
+            placeholder = { Text("Escribe para buscar…") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) IconButton({ query = ""; results = emptyList(); error = null }) { Icon(Icons.Default.Close, null) }
-            },
+            trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Default.Close, null) } },
         ) {}
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Songs") })
-            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Albums") })
-            FilterChip(selected = false, onClick = { doSearch(query) }, label = { Text("Playlists") })
-        }
-        Spacer(Modifier.height(8.dp))
 
+        Spacer(Modifier.height(8.dp))
         when {
-            loading -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(6) {
-                    ElevatedCard(Modifier.fillMaxWidth().height(68.dp)) {}
-                }
-            }
+            loading -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(6) { ElevatedCard(Modifier.fillMaxWidth().height(68.dp)) {} } }
             error != null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(error ?: "", color = MaterialTheme.colorScheme.error)
@@ -103,15 +99,22 @@ fun SearchScreen(
                 Text(if (query.isBlank()) "Busca o pega una URL para comenzar" else "Sin resultados")
             }
             else -> LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(results, key = { it.videoId }, contentType = { "track" }) { track ->
-                    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onOpenSong(track) }) {
+                items(results, key = { it.videoId }) { track ->
+                    ElevatedCard(Modifier.fillMaxWidth().clickable { onOpenSong(track) }) {
                         ListItem(
-                            headlineContent = { Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium) },
-                            supportingContent = {
-                                Text("${track.artist.ifBlank { "Unknown" }} · ${track.duration.ifBlank { "--:--" }}", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-                            },
+                            headlineContent = { Text(track.title.ifBlank { "Título desconocido" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            supportingContent = { Text("${track.artist.ifBlank { "Unknown" }} · ${track.duration.ifBlank { "--:--" }}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingContent = {
-                                AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small))
+                                if (track.coverUrl.isBlank()) {
+                                    Icon(Icons.Default.MusicNote, contentDescription = null)
+                                } else {
+                                    AsyncImage(
+                                        model = track.coverUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small),
+                                    )
+                                }
                             },
                             trailingContent = {
                                 Row {
@@ -124,8 +127,6 @@ fun SearchScreen(
                 }
             }
         }
-        AnimatedVisibility(visible = results.isNotEmpty()) {
-            Text("${results.size} resultados", style = MaterialTheme.typography.labelMedium)
-        }
+        AnimatedVisibility(visible = results.isNotEmpty()) { Text("${results.size} resultados", style = MaterialTheme.typography.labelMedium) }
     }
 }
