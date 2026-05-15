@@ -36,7 +36,7 @@ private data class DownloadHistoryItem(
 )
 
 @Composable
-fun DownloadsHistoryScreen(onBack: () -> Unit) {
+fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadHistoryItem>>(emptyList()) }
     var showHistory by remember { mutableStateOf(false) }
@@ -71,7 +71,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
             IconButton(onClick = { showHistory = !showHistory }) { Icon(Icons.Default.History, contentDescription = "Historial") }
         }
-        Text("Descargas", style = MaterialTheme.typography.headlineMedium)
+        Text(if (showQueueOnly) "Download Queue" else "Downloaded Media", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(10.dp))
         Text("Progreso y cola actual", style = MaterialTheme.typography.titleMedium)
         if (queue.isEmpty()) Text("Sin elementos en cola.")
@@ -87,8 +87,8 @@ fun DownloadsHistoryScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(10.dp))
 
-        if (!showHistory) {
-            Text("Pulsa historial para ver descargas previas.")
+        if (showQueueOnly) {
+            Text("Cola activa y estado actual de descargas.")
         } else if (items.isEmpty()) {
             Text("Sin descargas aún", style = MaterialTheme.typography.bodyMedium)
         } else {
