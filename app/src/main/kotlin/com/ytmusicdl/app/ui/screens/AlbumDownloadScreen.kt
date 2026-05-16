@@ -20,7 +20,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
-import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
 import kotlinx.coroutines.launch
@@ -34,6 +33,9 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
     var meta by remember { mutableStateOf("") }
     var exact by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
+    var playlistUrl by remember { mutableStateOf("") }
+    var playlistTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var playlistMeta by remember { mutableStateOf("") }
 
     LaunchedEffect(track.videoId) {
         loading = true
@@ -47,7 +49,7 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(20.dp).animateContentSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
-            Text("Album Download", style = MaterialTheme.typography.headlineMedium)
+            Text("Album / Playlist Download", style = MaterialTheme.typography.headlineMedium)
         }
         Row(Modifier.fillMaxWidth()) {
             if (track.coverUrl.isBlank()) {
@@ -67,34 +69,39 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
 
-        Button(onClick = { albumTracks.forEach { item -> scope.launch { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) } } }, enabled = exact && albumTracks.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Descargar álbum") }
+        Button(onClick = { albumTracks.forEach { item -> scope.launch { DownloadService.start(context, item) } } }, enabled = exact && albumTracks.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Descargar álbum") }
         AnimatedVisibility(visible = !exact && !loading) { Text("No exact match: revisa tracks antes de descargar", color = MaterialTheme.colorScheme.error) }
         Spacer(Modifier.height(10.dp))
 
         if (loading) {
-            repeat(4) {
-                ElevatedCard(Modifier.fillMaxWidth().height(58.dp)) {}
-                Spacer(Modifier.height(6.dp))
-            }
-        } else if (albumTracks.isEmpty()) {
-            Text("No se pudieron cargar tracks del álbum", style = MaterialTheme.typography.bodyMedium)
+            repeat(3) { ElevatedCard(Modifier.fillMaxWidth().height(58.dp)); Spacer(Modifier.height(6.dp)) }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 220.dp)) {
                 items(albumTracks, key = { it.videoId }) { item ->
                     val q = queue.firstOrNull { it.videoId == item.videoId }
                     ElevatedCard(Modifier.fillMaxWidth().clickable { DownloadService.start(context, item) }) {
                         ListItem(
                             headlineContent = { Text(item.title.ifBlank { "Track sin título" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${q?.status ?: "waiting"} · ${q?.progress ?: 0}% · ${item.duration.ifBlank { "--:--" }}") },
-                            trailingContent = {
-                                IconButton(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, item) }) {
-                                    Icon(Icons.Default.Download, contentDescription = null)
-                                }
-                            },
+                            supportingContent = { Text("${q?.status ?: "waiting"} · ${q?.progress ?: 0}% · ${q?.cliOutput ?: "[idle]"}") },
+                            trailingContent = { IconButton(onClick = { DownloadService.start(context, item) }) { Icon(Icons.Default.Download, contentDescription = null) } },
                         )
                     }
                 }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(value = playlistUrl, onValueChange = { playlistUrl = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Playlist URL / ID") })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                scope.launch {
+                    val r = ExtractorBackendProvider.backend.getPlaylistTracks(playlistUrl, 200)
+                    playlistTracks = r.tracks
+                    playlistMeta = "${r.playlist.title} · ${r.playlist.author} · ${r.playlist.trackCount}"
+                }
+            }, enabled = playlistUrl.isNotBlank()) { Text("Cargar playlist") }
+            OutlinedButton(onClick = { playlistTracks.forEach { item -> scope.launch { DownloadService.start(context, item) } } }, enabled = playlistTracks.isNotEmpty()) { Text("Descargar playlist") }
+        }
+        if (playlistMeta.isNotBlank()) Text(playlistMeta, style = MaterialTheme.typography.bodySmall)
     }
 }

@@ -1,7 +1,6 @@
 package com.ytmusicdl.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -20,14 +19,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.ytmusicdl.app.data.model.DownloadState
 import com.ytmusicdl.app.data.model.Track
 import com.ytmusicdl.app.service.DownloadService
 
 @Composable
 fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
     val context = LocalContext.current
-    val state by DownloadService.downloadState.collectAsState()
     val queue by DownloadService.queueState.collectAsState()
     val task = queue.firstOrNull { it.videoId == track.videoId }
 
@@ -50,34 +47,23 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
         Text("${track.album.ifBlank { "Álbum desconocido" }} · ${track.duration.ifBlank { "--:--" }}", style = MaterialTheme.typography.bodySmall)
 
         Spacer(Modifier.height(12.dp))
-        Crossfade(targetState = state, label = "download-state") { current ->
-            when (current) {
-                DownloadState.FetchingStream -> AssistChip(onClick = {}, label = { Text("Analizando fuente…") })
-                DownloadState.Converting -> AssistChip(onClick = {}, label = { Text("Convirtiendo audio…") })
-                DownloadState.WritingTags -> AssistChip(onClick = {}, label = { Text("Escribiendo metadata…") })
-                is DownloadState.Downloading -> {
-                    ElevatedCard(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Progreso ${current.progress}%")
-                            LinearProgressIndicator(progress = { current.progress / 100f }, modifier = Modifier.fillMaxWidth())
-                            Text("${"%.2f".format(current.mbDone)}MB / ${"%.2f".format(current.mbTotal)}MB")
-                            Text("Velocidad: -- MB/s · ETA: --:--", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                is DownloadState.Error -> Text(current.message, color = MaterialTheme.colorScheme.error)
-                is DownloadState.Done -> Text("Completado", color = MaterialTheme.colorScheme.primary)
-                DownloadState.Idle -> {}
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Estado: ${task?.status ?: "idle"}")
+                LinearProgressIndicator(progress = { (task?.progress ?: 0) / 100f }, modifier = Modifier.fillMaxWidth())
+                Text("${task?.format ?: "auto"} · ${if ((task?.bitrateKbps ?: 0) > 0) "${task?.bitrateKbps}kbps" else "bitrate N/A"}")
+                Text("Velocidad: ${"%.2f".format(task?.speedMbps ?: 0f)} MB/s · ETA: ${if ((task?.etaSec ?: -1) >= 0) "${task?.etaSec}s" else "--"}", style = MaterialTheme.typography.bodySmall)
+                Text(task?.cliOutput ?: "[idle] listo para iniciar", style = MaterialTheme.typography.labelSmall)
             }
         }
 
         AnimatedVisibility(visible = task != null) {
-            Text("Estado cola: ${task?.status ?: "-"} · ${task?.progress ?: 0}%", style = MaterialTheme.typography.bodySmall)
+            Text("Vinculado por videoId: ${task?.videoId}", style = MaterialTheme.typography.bodySmall)
         }
 
         Spacer(Modifier.height(20.dp))
         val canStart = task?.status != "downloading" && task?.status != "queued"
-        Button(onClick = { DownloadService.downloadState.value = DownloadState.FetchingStream; DownloadService.start(context, track) }, enabled = canStart, modifier = Modifier.fillMaxWidth().height(54.dp)) {
+        Button(onClick = { DownloadService.start(context, track) }, enabled = canStart, modifier = Modifier.fillMaxWidth().height(54.dp)) {
             Icon(Icons.Default.Download, null)
             Spacer(Modifier.width(8.dp))
             Text("Descargar")
