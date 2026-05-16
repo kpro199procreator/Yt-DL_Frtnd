@@ -74,7 +74,7 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
         Spacer(Modifier.height(10.dp))
 
         if (loading) {
-            repeat(3) { ElevatedCard(Modifier.fillMaxWidth().height(58.dp)); Spacer(Modifier.height(6.dp)) }
+            repeat(3) { ElevatedCard(Modifier.fillMaxWidth().height(58.dp)) {}; Spacer(Modifier.height(6.dp)) }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.heightIn(max = 220.dp)) {
                 items(albumTracks, key = { it.videoId }) { item ->
