@@ -40,6 +40,7 @@ def track_from_search_item(item: dict) -> dict:
         "coverUrl": _best_thumbnail_url(thumbs),
         "duration": item.get("duration", ""),
         "streamUrl": "",
+        "trackNumber": int(item.get("trackNumber") or 1),
     }
 
 
@@ -75,6 +76,7 @@ def get_music_metadata(video_id_or_query):
         "coverUrl": _best_thumbnail_url(thumbs),
         "duration": str(item.get("lengthSeconds", "")),
         "streamUrl": "",
+        "trackNumber": int(item.get("trackNumber") or 1),
     })
 
 

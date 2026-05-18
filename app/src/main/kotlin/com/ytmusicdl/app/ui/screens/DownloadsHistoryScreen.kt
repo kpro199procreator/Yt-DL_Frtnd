@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.ytmusicdl.app.data.db.AppDatabase
 import com.ytmusicdl.app.data.db.DownloadHistoryCacheEntity
 import com.ytmusicdl.app.service.DownloadService
@@ -97,7 +99,10 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
                                 Text(q.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                                 Text("${q.status} · Formato m4a · Calidad auto", style = MaterialTheme.typography.bodySmall)
                                 LinearProgressIndicator(progress = { q.progress / 100f }, modifier = Modifier.fillMaxWidth())
-                                Text("${q.progress}% · ETA --:-- · Velocidad -- MB/s", style = MaterialTheme.typography.labelSmall)
+                                Text("${q.progress}% · ETA ${if (q.etaSec >= 0) "${q.etaSec}s" else "--"} · Velocidad ${"%.2f".format(q.speedMbps)} MB/s", style = MaterialTheme.typography.labelSmall)
+                                Box(Modifier.fillMaxWidth().background(Color.Black, MaterialTheme.shapes.small).padding(8.dp)) {
+                                    Text(q.cliOutput, color = Color(0xFF8CFF8C), style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                     }
