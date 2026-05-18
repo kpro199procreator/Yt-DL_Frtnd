@@ -10,6 +10,11 @@ object EmbeddedPythonBackend : ExtractorBackend {
         PythonBridge.parseTrackList(json)
     }
 
+    override suspend fun searchAll(query: String, limit: Int): SearchBundle = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("search_all", query, limit)
+        PythonBridge.parseSearchBundle(json)
+    }
+
     override suspend fun listAudioFormats(videoId: String): List<AudioFormatOption> = withContext(Dispatchers.IO) {
         val json = PythonBridge.call("get_audio_formats", videoId)
         PythonBridge.parseAudioFormats(json)

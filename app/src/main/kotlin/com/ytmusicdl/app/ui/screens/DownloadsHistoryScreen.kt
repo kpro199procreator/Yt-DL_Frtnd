@@ -3,7 +3,11 @@ package com.ytmusicdl.app.ui.screens
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Environment
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.ytmusicdl.app.data.db.AppDatabase
 import com.ytmusicdl.app.data.db.DownloadHistoryCacheEntity
 import com.ytmusicdl.app.service.DownloadService
@@ -52,9 +57,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
             val toUpsert = mutableListOf<DownloadHistoryCacheEntity>()
             val result = files.map { file ->
                 val cache = cached[file.absolutePath]
-                if (cache != null && cache.lastModified == file.lastModified()) {
-                    cache.toUiItem()
-                } else {
+                if (cache != null && cache.lastModified == file.lastModified()) cache.toUiItem() else {
                     val refreshed = readMetadata(file)
                     toUpsert.add(refreshed)
                     refreshed.toUiItem()
@@ -67,57 +70,78 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
+            Text(if (showQueueOnly) "Queue" else "Offline Library", style = MaterialTheme.typography.headlineMedium)
             IconButton(onClick = { showHistory = !showHistory }) { Icon(Icons.Default.History, contentDescription = "Historial") }
         }
-        Text(if (showQueueOnly) "Download Queue" else "Downloaded Media", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(10.dp))
-        Text("Progreso y cola actual", style = MaterialTheme.typography.titleMedium)
-        if (queue.isEmpty()) Text("Sin elementos en cola.")
-        queue.forEach { q ->
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(10.dp)) {
-                    Text("${q.title} · ${if (q.album.isBlank()) "song" else "album/song"}")
-                    Text("Estado: ${q.status}")
-                    LinearProgressIndicator(progress = { q.progress / 100f }, modifier = Modifier.fillMaxWidth())
+
+        ElevatedCard(Modifier.fillMaxWidth().animateContentSize()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Centro de estado", style = MaterialTheme.typography.titleMedium)
+                Text(if (queue.isEmpty()) "Sin descargas activas" else "${queue.size} elementos en cola", style = MaterialTheme.typography.bodySmall)
+                AnimatedVisibility(visible = queue.isNotEmpty()) {
+                    Text("Descargando · En espera · Completadas · Fallidas", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            Spacer(Modifier.height(6.dp))
         }
+
         Spacer(Modifier.height(10.dp))
 
-        if (showQueueOnly) {
-            Text("Cola activa y estado actual de descargas.")
-        } else if (items.isEmpty()) {
-            Text("Sin descargas aún", style = MaterialTheme.typography.bodyMedium)
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items, key = { it.filePath }) { item ->
-                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            if (item.coverBytes != null) {
-                                val bitmap = remember(item.coverBytes) { BitmapFactory.decodeByteArray(item.coverBytes, 0, item.coverBytes.size) }
-                                bitmap?.let {
-                                    Image(
-                                        bitmap = it.asImageBitmap(),
-                                        contentDescription = "Carátula",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(56.dp),
-                                    )
-                                } ?: Icon(Icons.Default.MusicNote, contentDescription = null)
-                            } else {
-                                Icon(Icons.Default.MusicNote, contentDescription = null)
+        Crossfade(targetState = queue.isEmpty(), label = "queue-crossfade") { emptyQueue ->
+            if (emptyQueue) {
+                AssistChip(onClick = {}, label = { Text("Queue vacía") })
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 240.dp)) {
+                    items(queue, key = { it.videoId }) { q ->
+                        ElevatedCard(Modifier.fillMaxWidth().animateContentSize()) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(q.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                                Text("${q.status} · Formato m4a · Calidad auto", style = MaterialTheme.typography.bodySmall)
+                                LinearProgressIndicator(progress = { q.progress / 100f }, modifier = Modifier.fillMaxWidth())
+                                Text("${q.progress}% · ETA ${if (q.etaSec >= 0) "${q.etaSec}s" else "--"} · Velocidad ${"%.2f".format(q.speedMbps)} MB/s", style = MaterialTheme.typography.labelSmall)
+                                Box(Modifier.fillMaxWidth().background(Color.Black, MaterialTheme.shapes.small).padding(8.dp)) {
+                                    Text(q.cliOutput, color = Color(0xFF8CFF8C), style = MaterialTheme.typography.labelSmall)
+                                }
                             }
+                        }
+                    }
+                }
+            }
+        }
 
-                            Column(Modifier.weight(1f)) {
-                                Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Álbum: ${item.album}", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Duración: ${item.duration}", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(10.dp))
+        if (showQueueOnly) return@Column
+
+        Text("Archivos offline", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(6.dp))
+
+        Crossfade(targetState = items.isEmpty(), label = "library-crossfade") { emptyLibrary ->
+            if (emptyLibrary) {
+                Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+                    Text("Biblioteca vacía: aún no hay archivos descargados")
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(items, key = { it.filePath }) { item ->
+                        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                if (item.coverBytes != null) {
+                                    val bitmap = remember(item.coverBytes) { BitmapFactory.decodeByteArray(item.coverBytes, 0, item.coverBytes.size) }
+                                    bitmap?.let {
+                                        Image(bitmap = it.asImageBitmap(), contentDescription = "Carátula", contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp))
+                                    } ?: Icon(Icons.Default.MusicNote, contentDescription = null)
+                                } else Icon(Icons.Default.MusicNote, contentDescription = null)
+
+                                Column(Modifier.weight(1f)) {
+                                    Text(item.title.ifBlank { "Archivo sin título" }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(item.album.ifBlank { "Álbum desconocido" }, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Duración: ${item.duration.ifBlank { "--:--" }}", style = MaterialTheme.typography.bodySmall)
+                                }
                             }
                         }
                     }
@@ -134,26 +158,10 @@ private fun readMetadata(file: File): DownloadHistoryCacheEntity {
         val durationMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
         val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty().ifBlank { "Álbum desconocido" }
         val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty().ifBlank { file.nameWithoutExtension }
-        DownloadHistoryCacheEntity(
-            filePath = file.absolutePath,
-            title = title,
-            album = album,
-            duration = formatDuration(durationMs),
-            coverBytes = mmr.embeddedPicture,
-            lastModified = file.lastModified(),
-        )
+        DownloadHistoryCacheEntity(file.absolutePath, title, album, formatDuration(durationMs), mmr.embeddedPicture, file.lastModified())
     } catch (_: Exception) {
-        DownloadHistoryCacheEntity(
-            filePath = file.absolutePath,
-            title = file.nameWithoutExtension,
-            album = "Álbum desconocido",
-            duration = "--:--",
-            coverBytes = null,
-            lastModified = file.lastModified(),
-        )
-    } finally {
-        mmr.release()
-    }
+        DownloadHistoryCacheEntity(file.absolutePath, file.nameWithoutExtension, "Álbum desconocido", "--:--", null, file.lastModified())
+    } finally { mmr.release() }
 }
 
 private fun DownloadHistoryCacheEntity.toUiItem() = DownloadHistoryItem(filePath, title, album, duration, coverBytes)

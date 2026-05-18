@@ -124,9 +124,6 @@ dependencies {
     // ExoPlayer — reproducción de preview
     implementation(libs.media3.exoplayer)
 
-    // mobile-ffmpeg (LTS) como reemplazo de ffmpeg-kit
-    // Variante min para mantener tamaño menor del APK
-    implementation("com.github.tanersener:mobile-ffmpeg:4.4.LTS")
 
     // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
     implementation("net.jthink:jaudiotagger:3.0.1")

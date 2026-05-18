@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
 import com.ytmusicdl.app.data.SettingsPrefs
-import com.arthenica.mobileffmpeg.FFmpeg
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
 import com.ytmusicdl.app.data.model.DownloadState
@@ -28,25 +27,37 @@ import kotlinx.coroutines.sync.withPermit
  * Flujo:
  *   1. El backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
- *   3. Si es webm/opus → mobile-ffmpeg convierte a m4a
+ *   3. Mantiene contenedor de origen (sin conversión FFmpeg)
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
  *   5. Guarda en ~/Music en almacenamiento externo
  */
 class DownloadService : Service() {
-    data class QueueItem(val videoId: String, val title: String, val album: String, val progress: Int = 0, val status: String = "queued")
+    data class QueueItem(
+        val videoId: String,
+        val title: String,
+        val album: String,
+        val progress: Int = 0,
+        val status: String = "queued",
+        val format: String = "auto",
+        val bitrateKbps: Int = 0,
+        val speedMbps: Float = 0f,
+        val etaSec: Int = -1,
+        val cliOutput: String = "En cola…"
+    )
 
     companion object {
         const val CHANNEL_ID    = "ytmusicdl_downloads"
         const val NOTIF_ID      = 1001
-        const val EXTRA_TRACK   = "track"
-
-        // StateFlow compartido para que la UI observe el estado
+                // StateFlow compartido para que la UI observe el estado
         val downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
         val queueState = MutableStateFlow<List<QueueItem>>(emptyList())
         @Volatile private var limiter: Semaphore? = null
 
         fun start(context: Context, track: Track) {
-            queueState.update { it + QueueItem(track.videoId, track.title, track.album, 0, "queued") }
+            queueState.update { old ->
+                if (old.any { it.videoId == track.videoId && (it.status == "queued" || it.status == "downloading") }) old
+                else old + QueueItem(track.videoId, track.title, track.album)
+            }
             val intent = Intent(context, DownloadService::class.java).apply {
                 putExtra(EXTRA_TRACK_TITLE,  track.title)
                 putExtra(EXTRA_TRACK_ARTIST, track.artist)
@@ -101,7 +112,7 @@ class DownloadService : Service() {
         val sem = limiter ?: Semaphore(SettingsPrefs.maxConcurrent(applicationContext)).also { limiter = it }
         sem.withPermit {
         try {
-            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "downloading") else it } }
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "downloading", cliOutput = "[yt-dlp] preparando extracción", speedMbps = 0f, etaSec = -1) else it } }
             // 1. Extraer URL de audio
             downloadState.value = DownloadState.FetchingStream
             updateNotification(notifId, "Obteniendo stream…", 0)
@@ -119,6 +130,7 @@ class DownloadService : Service() {
                 stopSelf(); return
             }
             val qualityLabel = buildQualityLabel(extraction)
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(format = extraction.containerExt.ifBlank { "auto" }, bitrateKbps = extraction.bitrate, cliOutput = "[yt-dlp] format=${extraction.selectedFormatId.ifBlank { "auto" }} ${extraction.containerExt} ${extraction.bitrate}kbps") else it } }
             updateNotification(notifId, "Formato elegido: $qualityLabel", 0)
 
             val enrichedTrack = track.copy(
@@ -130,18 +142,27 @@ class DownloadService : Service() {
 
             // 2. Descargar el audio
             val tempFile = File(cacheDir, "${track.videoId}_temp.$ext")
-            downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal ->
+            downloadAudio(audioUrl, tempFile) { progress, mbDone, mbTotal, speedMbps, etaSec ->
                 downloadState.value = DownloadState.Downloading(progress, mbDone, mbTotal)
-                queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = progress, status = "downloading") else it } }
+                queueState.update { list ->
+                    list.map {
+                        if (it.videoId == track.videoId) it.copy(
+                            progress = progress,
+                            status = "downloading",
+                            speedMbps = speedMbps,
+                            etaSec = etaSec,
+                            cliOutput = "[download] ${"%.2f".format(mbDone)}/${"%.2f".format(mbTotal)}MB @ ${"%.2f".format(speedMbps)}MB/s"
+                        ) else it
+                    }
+                }
                 updateNotification(notifId, "Descargando $qualityLabel", progress)
             }
 
-            // 3. Convertir a m4a si es necesario (webm/opus → m4a/aac)
-            downloadState.value = DownloadState.Converting
-            updateNotification(notifId, "Procesando $qualityLabel…", 100)
-            val finalFile = convertIfNeeded(tempFile, enrichedTrack, ext)
+            // 3. Sin conversión FFmpeg: se conserva el archivo descargado
+            val finalFile = tempFile
 
             // 4. Escribir tags
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(cliOutput = "[postprocess] escribiendo tags", etaSec = 0) else it } }
             downloadState.value = DownloadState.WritingTags
             updateNotification(notifId, "Escribiendo metadata…", 100)
             writeTags(finalFile, enrichedTrack)
@@ -149,7 +170,7 @@ class DownloadService : Service() {
             // 5. Mover a carpeta de música
             val configuredPath = SettingsPrefs.downloadPath(applicationContext).trim().ifBlank { "/Music/ytmusicdl" }
             val outputDir = File(android.os.Environment.getExternalStorageDirectory(), configuredPath.removePrefix("/")).also { it.mkdirs() }
-            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".m4a"
+            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".${ext.ifBlank { "m4a" }}"
             val outputFile = File(outputDir, sanitize(outputName))
             finalFile.copyTo(outputFile, overwrite = true)
             tempFile.delete()
@@ -161,12 +182,12 @@ class DownloadService : Service() {
             )
 
             downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = 100, status = "done") else it } }
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = 100, status = "done", speedMbps = 0f, etaSec = 0, cliOutput = "[done] guardado en ${outputFile.name}") else it } }
             updateNotification(notifId, "✓ ${enrichedTrack.title} descargado ($qualityLabel)", 100)
 
         } catch (e: Exception) {
             downloadState.value = DownloadState.Error(e.message ?: "Error desconocido")
-            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "error") else it } }
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "error", cliOutput = "[error] ${e.message}") else it } }
             updateNotification(notifId, "Error: ${e.message}", 0)
         } finally {
             delay(1500)
@@ -187,7 +208,7 @@ class DownloadService : Service() {
     private suspend fun downloadAudio(
         url: String,
         dest: File,
-        onProgress: (Int, Float, Float) -> Unit,
+        onProgress: (Int, Float, Float, Float, Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val req  = Request.Builder().url(url)
             .header("User-Agent", "Mozilla/5.0 (compatible)")
@@ -197,6 +218,8 @@ class DownloadService : Service() {
 
         val total     = body.contentLength()
         var downloaded = 0L
+        var lastBytes = 0L
+        var lastAt = SystemClock.elapsedRealtime()
         val buffer    = ByteArray(8192)
 
         FileOutputStream(dest).use { out ->
@@ -209,28 +232,20 @@ class DownloadService : Service() {
                         val progress = (downloaded * 100 / total).toInt()
                         val mbDone   = downloaded / 1_048_576f
                         val mbTotal  = total / 1_048_576f
-                        onProgress(progress, mbDone, mbTotal)
+                        val now = SystemClock.elapsedRealtime()
+                        val dt = (now - lastAt).coerceAtLeast(1L)
+                        val dBytes = (downloaded - lastBytes).coerceAtLeast(0L)
+                        val speedMbps = (dBytes / 1_048_576f) / (dt / 1000f)
+                        val remainMb = (mbTotal - mbDone).coerceAtLeast(0f)
+                        val etaSec = if (speedMbps > 0.01f) (remainMb / speedMbps).toInt() else -1
+                        lastBytes = downloaded
+                        lastAt = now
+                        onProgress(progress, mbDone, mbTotal, speedMbps, etaSec)
                     }
                 }
             }
         }
     }
-
-    private suspend fun convertIfNeeded(input: File, track: Track, ext: String): File =
-        withContext(Dispatchers.IO) {
-            if (ext == "m4a") return@withContext input
-
-            // webm/opus → m4a con mobile-ffmpeg
-            val output = File(cacheDir, "${track.videoId}.m4a")
-            val rc = FFmpeg.execute(
-                "-i \"${input.absolutePath}\" -c:a aac -b:a 256k -vn \"${output.absolutePath}\""
-            )
-            if (rc != 0) {
-                // Si ffmpeg falla, devolver el archivo original sin convertir
-                return@withContext input
-            }
-            output
-        }
 
     private suspend fun writeTags(file: File, track: Track) = withContext(Dispatchers.IO) {
         try {
@@ -249,10 +264,10 @@ class DownloadService : Service() {
                 try {
                     val coverBytes = fetchBytes(track.coverUrl)
                     if (coverBytes != null) {
-                        val artwork = org.jaudiotagger.tag.images.ArtworkFactory
-                            .createArtworkFromFile(file)
+                        val artwork = org.jaudiotagger.tag.images.StandardArtwork()
                         artwork.binaryData = coverBytes
-                        artwork.mimeType   = "image/jpeg"
+                        artwork.mimeType = "image/jpeg"
+                        tag.deleteArtworkField()
                         tag.setField(artwork)
                     }
                 } catch (_: Exception) {}
