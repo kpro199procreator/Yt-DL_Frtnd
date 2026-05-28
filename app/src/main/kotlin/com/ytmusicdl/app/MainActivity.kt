@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -39,7 +38,6 @@ import com.ytmusicdl.app.ui.screens.AlbumDownloadScreen
 import com.ytmusicdl.app.ui.screens.DownloadsHistoryScreen
 import com.ytmusicdl.app.ui.screens.HomeScreen
 import com.ytmusicdl.app.ui.screens.SearchScreen
-import com.ytmusicdl.app.ui.screens.SettingsScreen
 import com.ytmusicdl.app.ui.screens.SongDownloadScreen
 import com.ytmusicdl.app.ui.theme.YtmusicdlTheme
 
@@ -52,7 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppTab { HOME, SEARCH, QUEUE, LIBRARY, SETTINGS }
+private enum class AppTab { HOME, SEARCH, QUEUE, LIBRARY }
 private enum class DetailMode { SONG, ALBUM }
 
 @Composable
@@ -79,7 +77,6 @@ fun App(pythonError: String? = null) {
                 NavigationBarItem(selected = tab == AppTab.SEARCH, onClick = { tab = AppTab.SEARCH }, icon = { Icon(Icons.Default.Search, null) }, label = { Text("Search") })
                 NavigationBarItem(selected = tab == AppTab.QUEUE, onClick = { tab = AppTab.QUEUE }, icon = { Icon(Icons.Default.Download, null) }, label = { Text("Queue") })
                 NavigationBarItem(selected = tab == AppTab.LIBRARY, onClick = { tab = AppTab.LIBRARY }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text("Library") })
-                NavigationBarItem(selected = tab == AppTab.SETTINGS, onClick = { tab = AppTab.SETTINGS }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
             }
         }
     }) { padding ->
@@ -107,7 +104,6 @@ fun App(pythonError: String? = null) {
                         )
                         AppTab.QUEUE -> DownloadsHistoryScreen(onBack = { tab = AppTab.HOME }, showQueueOnly = true)
                         AppTab.LIBRARY -> DownloadsHistoryScreen(onBack = { tab = AppTab.HOME }, showQueueOnly = false)
-                        AppTab.SETTINGS -> SettingsScreen()
                     }
                 }
             }
