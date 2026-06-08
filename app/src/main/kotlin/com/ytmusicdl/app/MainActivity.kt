@@ -90,10 +90,7 @@ fun App(pythonError: String? = null) {
                 } else {
                     when (currentTab) {
                         AppTab.HOME -> HomeScreen(
-                            onOpenSearch = { tab = AppTab.SEARCH },
                             onQuickSearch = { seedQuery = it; tab = AppTab.SEARCH },
-                            onOpenQueue = { tab = AppTab.QUEUE },
-                            onOpenLibrary = { tab = AppTab.LIBRARY },
                         )
                         AppTab.SEARCH -> SearchScreen(
                             onOpenSong = { detailMode = DetailMode.SONG; selectedTrack = it },

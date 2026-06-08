@@ -71,6 +71,10 @@ fun SearchScreen(
         }
     }
 
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank() && initialQuery != query) query = initialQuery
+    }
+
     LaunchedEffect(query, mode) { doSearch(query.trim()) }
 
     Box(Modifier.fillMaxSize()) {
