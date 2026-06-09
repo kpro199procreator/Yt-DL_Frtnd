@@ -76,10 +76,21 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
 
     LaunchedEffect(track.videoId) {
         loading = true
-        val result = ExtractorBackendProvider.backend.getAlbumTracks(track.album.ifBlank { track.title }, track.artist)
-        albumTracks = result.tracks
-        exact = result.exactMatch
-        meta = context.getString(R.string.album_meta_format, result.album.title.ifBlank { unknownAlbum }, result.album.year, result.album.trackCount)
+        if (track.album.equals("Playlist", ignoreCase = true)) {
+            val result = ExtractorBackendProvider.backend.getPlaylistTracks(track.videoId, 200)
+            playlistTracks = result.tracks
+            playlistMeta = context.getString(R.string.playlist_meta_format, result.playlist.title.ifBlank { track.title }, result.playlist.author, result.playlist.trackCount)
+            albumTracks = emptyList()
+            exact = false
+            meta = playlistMeta
+        } else {
+            val result = ExtractorBackendProvider.backend.getAlbumTracks(track.album.ifBlank { track.title }, track.artist)
+            albumTracks = result.tracks
+            exact = result.exactMatch
+            meta = context.getString(R.string.album_meta_format, result.album.title.ifBlank { unknownAlbum }, result.album.year, result.album.trackCount)
+            playlistTracks = emptyList()
+            playlistMeta = ""
+        }
         loading = false
     }
 
