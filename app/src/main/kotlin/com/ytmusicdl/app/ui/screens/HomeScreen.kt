@@ -7,23 +7,16 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -37,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -53,7 +47,7 @@ fun HomeScreen(
         val cleanQuery = query.trim()
         if (cleanQuery.isNotEmpty()) {
             isLaunchingSearch = true
-            delay(260)
+            delay(320)
             onQuickSearch(cleanQuery)
         } else {
             isLaunchingSearch = false
@@ -70,76 +64,68 @@ fun HomeScreen(
         AnimatedVisibility(
             visible = !isLaunchingSearch,
             exit = slideOutVertically(
-                animationSpec = tween(durationMillis = 240),
+                animationSpec = tween(durationMillis = 300),
                 targetOffsetY = { fullHeight -> -fullHeight },
             ),
         ) {
-            ElevatedCard(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text("Buscar música", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Escribe o pega una URL para continuar en Search.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        FilledTonalButton(
-                            onClick = { query = clipboardManager.getText()?.text.orEmpty() },
-                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                        ) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
-                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                            Text("Pegar")
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        SearchBar(
-                            query = query,
-                            onQueryChange = { query = it },
-                            onSearch = { submitted ->
-                                if (submitted.isNotBlank()) query = submitted
-                            },
-                            active = false,
-                            onActiveChange = {},
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Song, album, playlist o URL") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            shape = MaterialTheme.shapes.extraLarge,
-                            colors = SearchBarDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            ),
-                        ) {}
-                    }
-                }
+                Text(
+                    text = "Ytmusicdl",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                HomeSearchBar(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onPaste = { query = clipboardManager.getText()?.text.orEmpty() },
+                )
             }
         }
 
         if (isLaunchingSearch) {
-            SearchBar(
+            HomeSearchBar(
                 query = query,
                 onQueryChange = { query = it },
-                onSearch = {},
-                active = false,
-                onActiveChange = {},
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                placeholder = { Text("Abriendo Search…") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = SearchBarDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-            ) {}
+                onPaste = { query = clipboardManager.getText()?.text.orEmpty() },
+                modifier = Modifier.padding(top = 12.dp),
+                placeholder = "Abriendo Search…",
+            )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onPaste: () -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "Song, album, playlist o URL",
+) {
+    SearchBar(
+        query = query,
+        onQueryChange = onQueryChange,
+        onSearch = { submitted -> if (submitted.isNotBlank()) onQueryChange(submitted) },
+        active = false,
+        onActiveChange = {},
+        modifier = modifier.fillMaxWidth(),
+        placeholder = { Text(placeholder) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            IconButton(onClick = onPaste) {
+                Icon(Icons.Default.ContentPaste, contentDescription = "Pegar")
+            }
+        },
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = SearchBarDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {}
 }
