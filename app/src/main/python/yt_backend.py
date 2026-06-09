@@ -38,7 +38,7 @@ def _score_audio_format(fmt: dict) -> tuple:
     return abr, container_score, has_size, protocol_score
 
 def _extract_info_with_fallback(url: str):
-    format_attempts = ["140","251","140/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best","bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"]
+    format_attempts = ["251","140","140/bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best","bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"]
     last_error = None
     for fmt in format_attempts:
         opts = dict(BASE_YDL_OPTS); opts["format"] = fmt
