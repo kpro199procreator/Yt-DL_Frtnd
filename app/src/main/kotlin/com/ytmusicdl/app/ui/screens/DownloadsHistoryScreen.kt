@@ -1,5 +1,7 @@
 package com.ytmusicdl.app.ui.screens
 
+import com.ytmusicdl.app.R
+
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
@@ -62,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -88,6 +91,8 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<DownloadHistoryItem>>(emptyList()) }
     val queue by DownloadService.queueState.collectAsState()
+    val unknownAlbum = stringResource(R.string.unknown_album)
+    val noDuration = stringResource(R.string.no_duration)
 
     LaunchedEffect(Unit) {
         val dao = AppDatabase.get(context).historyCacheDao()
@@ -104,7 +109,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
             val result = files.map { file ->
                 val cache = cached[file.absolutePath]
                 if (cache != null && cache.lastModified == file.lastModified()) cache.toUiItem() else {
-                    val refreshed = readMetadata(file)
+                    val refreshed = readMetadata(file, unknownAlbum, noDuration)
                     toUpsert.add(refreshed)
                     refreshed.toUiItem()
                 }
@@ -117,8 +122,8 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
-            Text(if (showQueueOnly) "Queue" else "Offline Library", style = MaterialTheme.typography.headlineMedium)
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back)) }
+            Text(if (showQueueOnly) stringResource(R.string.queue_title) else stringResource(R.string.offline_library_title), style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.size(48.dp))
         }
 
@@ -130,7 +135,7 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
             LibraryContent(items = items, onOpenFile = { item ->
                 val file = File(item.filePath)
                 if (!file.exists()) {
-                    Toast.makeText(context, "Archivo no encontrado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.file_not_found), Toast.LENGTH_SHORT).show()
                     return@LibraryContent
                 }
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -138,9 +143,9 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
                     setDataAndType(uri, mimeTypeFor(file))
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                val chooser = Intent.createChooser(intent, "Abrir con reproductor de música")
+                val chooser = Intent.createChooser(intent, context.getString(R.string.open_with_music_player))
                 runCatching { context.startActivity(chooser) }
-                    .onFailure { Toast.makeText(context, "No hay reproductor disponible", Toast.LENGTH_SHORT).show() }
+                    .onFailure { Toast.makeText(context, context.getString(R.string.no_music_player), Toast.LENGTH_SHORT).show() }
             })
         }
     }
@@ -150,15 +155,15 @@ fun DownloadsHistoryScreen(onBack: () -> Unit, showQueueOnly: Boolean = false) {
 private fun QueueContent(queue: List<DownloadService.QueueItem>) {
     ElevatedCard(Modifier.fillMaxWidth().animateContentSize(), shape = MaterialTheme.shapes.extraLarge) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Estado de descargas", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.downloads_status_title), style = MaterialTheme.typography.titleLarge)
             Text(
-                if (queue.isEmpty()) "No hay descargas activas." else "${queue.size} elemento(s) con progreso incremental en tiempo real.",
+                if (queue.isEmpty()) stringResource(R.string.no_active_downloads) else stringResource(R.string.queue_count_status, queue.size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("Queue") }, leadingIcon = { Icon(Icons.Default.HourglassTop, null) })
-                AssistChip(onClick = {}, label = { Text("Material 3") })
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.queue_title)) }, leadingIcon = { Icon(Icons.Default.HourglassTop, null) })
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.material3)) })
             }
         }
     }
@@ -168,7 +173,7 @@ private fun QueueContent(queue: List<DownloadService.QueueItem>) {
     Crossfade(targetState = queue.isEmpty(), label = "queue-crossfade") { emptyQueue ->
         if (emptyQueue) {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text("Queue vacía", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.queue_empty), style = MaterialTheme.typography.titleMedium)
             }
         } else {
             LazyColumn(
@@ -191,10 +196,10 @@ private fun QueueItemCard(item: DownloadService.QueueItem) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(statusIcon(item.status), contentDescription = null, tint = statusColor(item.status))
                 Column(Modifier.weight(1f)) {
-                    Text(item.title.ifBlank { "Descarga sin título" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
+                    Text(item.title.ifBlank { stringResource(R.string.download_without_title) }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
                     Text(statusLabel(item.status), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                FilterChip(selected = true, onClick = {}, label = { Text("${item.progress}%") })
+                FilterChip(selected = true, onClick = {}, label = { Text(stringResource(R.string.progress_percent, item.progress)) })
             }
 
             LinearProgressIndicator(
@@ -223,15 +228,15 @@ private fun QueueItemCard(item: DownloadService.QueueItem) {
                         Icon(Icons.Default.AudioFile, contentDescription = null)
                         Icon(Icons.Default.ArrowForward, contentDescription = null)
                         Icon(Icons.Default.Folder, contentDescription = null)
-                        Text("Archivo movido visualmente a Library", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.download_moved_to_library), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("ETA ${if (item.etaSec >= 0) "${item.etaSec}s" else "--"}") }, leadingIcon = { Icon(Icons.Default.HourglassTop, null) })
-                AssistChip(onClick = {}, label = { Text("${"%.2f".format(item.speedMbps)} MB/s") }, leadingIcon = { Icon(Icons.Default.Speed, null) })
-                AssistChip(onClick = {}, label = { Text("m4a auto") }, leadingIcon = { Icon(Icons.Default.AudioFile, null) })
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.eta_value, if (item.etaSec >= 0) "${item.etaSec}s" else stringResource(R.string.no_duration))) }, leadingIcon = { Icon(Icons.Default.HourglassTop, null) })
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.speed_value, item.speedMbps)) }, leadingIcon = { Icon(Icons.Default.Speed, null) })
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.format_m4a_auto)) }, leadingIcon = { Icon(Icons.Default.AudioFile, null) })
             }
 
             if (item.cliOutput.isNotBlank()) {
@@ -254,7 +259,7 @@ private fun QueueItemCard(item: DownloadService.QueueItem) {
 
 @Composable
 private fun LibraryContent(items: List<DownloadHistoryItem>, onOpenFile: (DownloadHistoryItem) -> Unit) {
-    Text("Archivos offline", style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.offline_files), style = MaterialTheme.typography.titleMedium)
     Text(
         "Solo audio: .mp3, .m4a, .wav y .webm",
         style = MaterialTheme.typography.bodySmall,
@@ -265,7 +270,7 @@ private fun LibraryContent(items: List<DownloadHistoryItem>, onOpenFile: (Downlo
     Crossfade(targetState = items.isEmpty(), label = "library-crossfade") { emptyLibrary ->
         if (emptyLibrary) {
             Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                Text("Biblioteca vacía: aún no hay archivos de audio descargados")
+                Text(stringResource(R.string.empty_audio_library))
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -275,16 +280,16 @@ private fun LibraryContent(items: List<DownloadHistoryItem>, onOpenFile: (Downlo
                         shape = MaterialTheme.shapes.large,
                     ) {
                         ListItem(
-                            headlineContent = { Text(item.title.ifBlank { "Archivo sin título" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            headlineContent = { Text(item.title.ifBlank { stringResource(R.string.unknown_file_title) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = {
                                 Text(
-                                    "${item.album.ifBlank { "Álbum desconocido" }} · ${item.duration.ifBlank { "--:--" }}",
+                                    stringResource(R.string.library_item_subtitle, item.album.ifBlank { stringResource(R.string.unknown_album) }, item.duration.ifBlank { stringResource(R.string.no_duration) }),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             },
                             leadingContent = { Artwork(item.coverBytes) },
-                            trailingContent = { Icon(Icons.Default.PlayArrow, contentDescription = "Abrir") },
+                            trailingContent = { Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.open)) },
                         )
                     }
                 }
@@ -300,7 +305,7 @@ private fun Artwork(coverBytes: ByteArray?) {
         bitmap?.let {
             Image(
                 bitmap = it.asImageBitmap(),
-                contentDescription = "Carátula",
+                contentDescription = stringResource(R.string.cover_art),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.medium),
             )
@@ -310,23 +315,23 @@ private fun Artwork(coverBytes: ByteArray?) {
     }
 }
 
-private fun readMetadata(file: File): DownloadHistoryCacheEntity {
+private fun readMetadata(file: File, unknownAlbum: String, noDuration: String): DownloadHistoryCacheEntity {
     val mmr = MediaMetadataRetriever()
     return try {
         mmr.setDataSource(file.absolutePath)
         val durationMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-        val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty().ifBlank { "Álbum desconocido" }
+        val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM).orEmpty().ifBlank { unknownAlbum }
         val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE).orEmpty().ifBlank { file.nameWithoutExtension }
-        DownloadHistoryCacheEntity(file.absolutePath, title, album, formatDuration(durationMs), mmr.embeddedPicture, file.lastModified())
+        DownloadHistoryCacheEntity(file.absolutePath, title, album, formatDuration(durationMs, noDuration), mmr.embeddedPicture, file.lastModified())
     } catch (_: Exception) {
-        DownloadHistoryCacheEntity(file.absolutePath, file.nameWithoutExtension, "Álbum desconocido", "--:--", null, file.lastModified())
+        DownloadHistoryCacheEntity(file.absolutePath, file.nameWithoutExtension, unknownAlbum, noDuration, null, file.lastModified())
     } finally { mmr.release() }
 }
 
 private fun DownloadHistoryCacheEntity.toUiItem() = DownloadHistoryItem(filePath, title, album, duration, coverBytes)
 
-private fun formatDuration(durationMs: Long): String {
-    if (durationMs <= 0L) return "--:--"
+private fun formatDuration(durationMs: Long, noDuration: String): String {
+    if (durationMs <= 0L) return noDuration
     val totalSec = durationMs / 1000
     val min = totalSec / 60
     val sec = totalSec % 60
@@ -341,12 +346,13 @@ private fun mimeTypeFor(file: File): String = when (file.extension.lowercase(Loc
     else -> "audio/*"
 }
 
+@Composable
 private fun statusLabel(status: String): String = when (status.lowercase(Locale.ROOT)) {
-    "downloading" -> "Descargando: recibiendo datos y actualizando progreso"
-    "queued" -> "En espera: listo para iniciar cuando haya un slot libre"
-    "done", "completed" -> "Completada: archivo guardado en la biblioteca"
-    "error", "failed" -> "Fallida: revisa el detalle del backend"
-    else -> status.ifBlank { "Procesando" }
+    "downloading" -> stringResource(R.string.status_downloading_verbose)
+    "queued" -> stringResource(R.string.status_queued_verbose)
+    "done", "completed" -> stringResource(R.string.status_completed_verbose)
+    "error", "failed" -> stringResource(R.string.status_failed_verbose)
+    else -> status.ifBlank { stringResource(R.string.status_processing) }
 }
 
 private fun statusIcon(status: String) = when (status.lowercase(Locale.ROOT)) {

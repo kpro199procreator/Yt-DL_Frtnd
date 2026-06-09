@@ -1,5 +1,7 @@
 package com.ytmusicdl.app.ui.screens
 
+import com.ytmusicdl.app.R
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
@@ -49,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -60,6 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
     val context = LocalContext.current
+    val unknownAlbum = stringResource(R.string.unknown_album)
     val scope = rememberCoroutineScope()
     val queue by DownloadService.queueState.collectAsState()
     var albumTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
@@ -75,7 +79,7 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
         val result = ExtractorBackendProvider.backend.getAlbumTracks(track.album.ifBlank { track.title }, track.artist)
         albumTracks = result.tracks
         exact = result.exactMatch
-        meta = "${result.album.title.ifBlank { "Álbum desconocido" }} · ${result.album.year} · ${result.album.trackCount} tracks"
+        meta = context.getString(R.string.album_meta_format, result.album.title.ifBlank { unknownAlbum }, result.album.year, result.album.trackCount)
         loading = false
     }
 
@@ -86,10 +90,10 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
     ) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
+                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back)) }
                 Column(Modifier.weight(1f)) {
-                    Text("Album Download", style = MaterialTheme.typography.headlineMedium)
-                    Text("Álbumes y playlists con estilo Material 3", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.album_download_title), style = MaterialTheme.typography.headlineMedium)
+                    Text(stringResource(R.string.album_download_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -99,11 +103,11 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
                 Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     AlbumArtwork(track.coverUrl)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(track.album.ifBlank { track.title.ifBlank { "Álbum desconocido" } }, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(track.artist.ifBlank { "Unknown" }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(track.album.ifBlank { track.title.ifBlank { stringResource(R.string.unknown_album) } }, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist.ifBlank { stringResource(R.string.unknown_artist) }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AssistChip(onClick = {}, label = { Text(track.year.ifBlank { "----" }) }, leadingIcon = { Icon(Icons.Default.Album, null) })
-                            AssistChip(onClick = {}, label = { Text(if (meta.isBlank()) "Metadata…" else meta, maxLines = 1, overflow = TextOverflow.Ellipsis) })
+                            AssistChip(onClick = {}, label = { Text(track.year.ifBlank { stringResource(R.string.unknown_year) }) }, leadingIcon = { Icon(Icons.Default.Album, null) })
+                            AssistChip(onClick = {}, label = { Text(if (meta.isBlank()) stringResource(R.string.metadata_loading) else meta, maxLines = 1, overflow = TextOverflow.Ellipsis) })
                         }
                     }
                 }
@@ -119,10 +123,10 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
             ) {
                 Icon(Icons.Default.LibraryMusic, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Descargar álbum")
+                Text(stringResource(R.string.download_album))
             }
             AnimatedVisibility(visible = !exact && !loading, enter = fadeIn()) {
-                Text("No exact match: revisa tracks antes de descargar", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                Text(stringResource(R.string.no_exact_match), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
             }
         }
 
@@ -133,8 +137,8 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
                 val q = queue.firstOrNull { it.videoId == item.videoId }
                 ElevatedCard(Modifier.fillMaxWidth().clickable { DownloadService.start(context, item) }, shape = MaterialTheme.shapes.large) {
                     ListItem(
-                        headlineContent = { Text(item.title.ifBlank { "Track sin título" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text("${q?.status ?: "waiting"} · ${q?.progress ?: 0}%", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        headlineContent = { Text(item.title.ifBlank { stringResource(R.string.track_without_title) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text(stringResource(R.string.status_progress, q?.status ?: stringResource(R.string.waiting), q?.progress ?: 0), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingContent = { Icon(Icons.Default.MusicNote, contentDescription = null) },
                         trailingContent = { IconButton(onClick = { DownloadService.start(context, item) }) { Icon(Icons.Default.Download, contentDescription = null) } },
                     )
@@ -145,13 +149,13 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
         item {
             ElevatedCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Playlist", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.playlist_title), style = MaterialTheme.typography.titleLarge)
                     OutlinedTextField(
                         value = playlistUrl,
                         onValueChange = { playlistUrl = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Playlist URL / ID") },
+                        label = { Text(stringResource(R.string.playlist_url_label)) },
                         shape = MaterialTheme.shapes.extraLarge,
                         leadingIcon = { Icon(Icons.Default.PlaylistPlay, contentDescription = null) },
                     )
@@ -160,10 +164,10 @@ fun AlbumDownloadScreen(track: Track, onBack: () -> Unit) {
                             scope.launch {
                                 val r = ExtractorBackendProvider.backend.getPlaylistTracks(playlistUrl, 200)
                                 playlistTracks = r.tracks
-                                playlistMeta = "${r.playlist.title} · ${r.playlist.author} · ${r.playlist.trackCount} tracks"
+                                playlistMeta = context.getString(R.string.playlist_meta_format, r.playlist.title, r.playlist.author, r.playlist.trackCount)
                             }
-                        }, enabled = playlistUrl.isNotBlank(), shape = MaterialTheme.shapes.extraLarge) { Text("Cargar") }
-                        Button(onClick = { playlistTracks.forEach { item -> scope.launch { DownloadService.start(context, item) } } }, enabled = playlistTracks.isNotEmpty(), shape = MaterialTheme.shapes.extraLarge) { Text("Descargar") }
+                        }, enabled = playlistUrl.isNotBlank(), shape = MaterialTheme.shapes.extraLarge) { Text(stringResource(R.string.load_playlist)) }
+                        Button(onClick = { playlistTracks.forEach { item -> scope.launch { DownloadService.start(context, item) } } }, enabled = playlistTracks.isNotEmpty(), shape = MaterialTheme.shapes.extraLarge) { Text(stringResource(R.string.download_playlist)) }
                     }
                     if (playlistMeta.isNotBlank()) Text(playlistMeta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

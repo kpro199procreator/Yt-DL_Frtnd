@@ -1,5 +1,7 @@
 package com.ytmusicdl.app.ui.screens
 
+import com.ytmusicdl.app.R
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
@@ -43,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,10 +68,10 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Atrás") }
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back)) }
             Column(Modifier.weight(1f)) {
-                Text("Song Download", style = MaterialTheme.typography.headlineMedium)
-                Text("Material 3 audio package", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.song_download_title), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.song_download_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -80,17 +83,17 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
             ) {
                 TrackArtwork(track.coverUrl, size = 260)
                 Text(
-                    track.title.ifBlank { "Título desconocido" },
+                    track.title.ifBlank { stringResource(R.string.unknown_title) },
                     style = MaterialTheme.typography.headlineSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
                 )
-                Text(track.artist.ifBlank { "Unknown" }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(track.artist.ifBlank { stringResource(R.string.unknown_artist) }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = {}, label = { Text(track.duration.ifBlank { "--:--" }) })
-                    AssistChip(onClick = {}, label = { Text("#${track.trackNumber}") })
-                    AssistChip(onClick = {}, label = { Text(track.album.ifBlank { "Single" }, maxLines = 1, overflow = TextOverflow.Ellipsis) })
+                    AssistChip(onClick = {}, label = { Text(track.duration.ifBlank { stringResource(R.string.no_duration) }) })
+                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.track_number, track.trackNumber)) })
+                    AssistChip(onClick = {}, label = { Text(track.album.ifBlank { stringResource(R.string.single) }, maxLines = 1, overflow = TextOverflow.Ellipsis) })
                 }
             }
         }
@@ -103,7 +106,7 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
         ) {
             Icon(Icons.Default.Download, null)
             Spacer(Modifier.width(8.dp))
-            Text(if (isComplete) "Descargar de nuevo" else "Descargar")
+            Text(if (isComplete) stringResource(R.string.download_again) else stringResource(R.string.download_action))
         }
 
         AnimatedVisibility(visible = showProgress && !isComplete, enter = fadeIn(), exit = fadeOut()) {
@@ -111,13 +114,13 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.tertiary)
-                        Text("Estado: ${task?.status ?: "preparing"}", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.status_label, task?.status ?: stringResource(R.string.preparing)), style = MaterialTheme.typography.titleMedium)
                     }
                     LinearProgressIndicator(progress = { (task?.progress ?: 0) / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(MaterialTheme.shapes.extraLarge))
-                    Text("${task?.format ?: "auto"} · ${if ((task?.bitrateKbps ?: 0) > 0) "${task?.bitrateKbps}kbps" else "bitrate N/A"}")
-                    Text("Velocidad: ${"%.2f".format(task?.speedMbps ?: 0f)} MB/s · ETA: ${if ((task?.etaSec ?: -1) >= 0) "${task?.etaSec}s" else "--"}", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.format_bitrate, task?.format ?: stringResource(R.string.format_auto), if ((task?.bitrateKbps ?: 0) > 0) stringResource(R.string.bitrate_kbps, task?.bitrateKbps ?: 0) else stringResource(R.string.bitrate_na)))
+                    Text(stringResource(R.string.speed_eta, task?.speedMbps ?: 0f, if ((task?.etaSec ?: -1) >= 0) "${task?.etaSec}s" else stringResource(R.string.no_duration)), style = MaterialTheme.typography.bodySmall)
                     Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium).padding(10.dp)) {
-                        Text(task?.cliOutput ?: "[idle]", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                        Text(task?.cliOutput ?: stringResource(R.string.idle_cli), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -127,7 +130,7 @@ fun SongDownloadScreen(track: Track, onBack: () -> Unit) {
             Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Completado y listo en Library", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(stringResource(R.string.completed_library), color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }

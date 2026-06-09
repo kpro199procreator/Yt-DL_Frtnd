@@ -1,5 +1,7 @@
 package com.ytmusicdl.app.ui.screens
 
+import com.ytmusicdl.app.R
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
@@ -12,6 +14,7 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,7 +23,7 @@ fun YtmusicSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Song, album, playlist o URL",
+    placeholder: String = stringResource(R.string.search_placeholder),
     onPaste: (() -> Unit)? = null,
     showClear: Boolean = false,
     onSearch: (String) -> Unit = {},
@@ -38,8 +41,8 @@ fun YtmusicSearchBar(
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon = {
             when {
-                onPaste != null -> IconButton(onClick = onPaste) { Icon(Icons.Default.ContentPaste, contentDescription = "Pegar") }
-                showClear && query.isNotEmpty() -> IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Close, contentDescription = "Limpiar") }
+                onPaste != null -> IconButton(onClick = onPaste) { Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste)) }
+                showClear && query.isNotEmpty() -> IconButton(onClick = { onQueryChange("") }) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear)) }
             }
         },
         shape = MaterialTheme.shapes.extraLarge,
