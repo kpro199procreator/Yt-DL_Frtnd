@@ -8,11 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -37,10 +36,10 @@ fun SearchScreen(
     onOpenSong: (Track) -> Unit,
     onOpenAlbum: (Track) -> Unit,
     onBack: () -> Unit,
-    initialQuery: String = "",
+    query: String,
+    onQueryChange: (String) -> Unit,
     onGlobalBackendError: (String) -> Unit = {},
 ) {
-    var query by remember { mutableStateOf(initialQuery) }
     var results by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -48,6 +47,7 @@ fun SearchScreen(
     var mode by remember { mutableStateOf(SearchMode.SONGS) }
     var showFabMenu by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
 
     fun doSearch(q: String) {
         if (q.isBlank()) {
@@ -74,10 +74,6 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(initialQuery) {
-        if (initialQuery.isNotBlank() && initialQuery != query) query = initialQuery
-    }
-
     LaunchedEffect(query, mode) { doSearch(query.trim()) }
 
     Box(Modifier.fillMaxSize()) {
@@ -90,21 +86,16 @@ fun SearchScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            SearchBar(
+            YtmusicSearchBar(
                 query = query,
-                onQueryChange = { query = it },
-                onSearch = ::doSearch,
-                active = false,
-                onActiveChange = {},
+                onQueryChange = onQueryChange,
+                onSearch = { submitted ->
+                    onQueryChange(submitted)
+                    doSearch(submitted)
+                },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Escribe para buscar…") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Default.Close, null) } },
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = SearchBarDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ),
-            ) {}
+                onPaste = { onQueryChange(clipboardManager.getText()?.text.orEmpty()) },
+            )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = mode == SearchMode.SONGS, onClick = { mode = SearchMode.SONGS }, label = { Text("Songs") }, leadingIcon = { Icon(Icons.Default.MusicNote, null) })
@@ -124,7 +115,7 @@ fun SearchScreen(
                                 supportingContent = { Text("${track.artist.ifBlank { "Unknown" }} · ${track.duration.ifBlank { "--:--" }} · #${track.trackNumber}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 leadingContent = {
                                     if (track.coverUrl.isBlank()) Icon(Icons.Default.MusicNote, contentDescription = null)
-                                    else AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(MaterialTheme.shapes.small))
+                                    else AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(72.dp).clip(MaterialTheme.shapes.medium))
                                 },
                                 trailingContent = { IconButton(onClick = { onOpenSong(track) }) { Icon(Icons.Default.Download, null) } },
                             )

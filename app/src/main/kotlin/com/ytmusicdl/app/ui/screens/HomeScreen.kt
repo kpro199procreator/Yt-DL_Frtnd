@@ -11,15 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,12 +26,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun HomeScreen(
+    query: String,
+    onQueryChange: (String) -> Unit,
     onQuickSearch: (String) -> Unit,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
     var isLaunchingSearch by rememberSaveable { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
 
@@ -80,52 +73,24 @@ fun HomeScreen(
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                HomeSearchBar(
+                YtmusicSearchBar(
                     query = query,
-                    onQueryChange = { query = it },
-                    onPaste = { query = clipboardManager.getText()?.text.orEmpty() },
+                    onQueryChange = onQueryChange,
+                    onPaste = { onQueryChange(clipboardManager.getText()?.text.orEmpty()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    onSearch = onQueryChange,
                 )
             }
         }
 
         if (isLaunchingSearch) {
-            HomeSearchBar(
+            YtmusicSearchBar(
                 query = query,
-                onQueryChange = { query = it },
-                onPaste = { query = clipboardManager.getText()?.text.orEmpty() },
-                modifier = Modifier.padding(top = 12.dp),
-                placeholder = "Abriendo Search…",
+                onQueryChange = onQueryChange,
+                onPaste = { onQueryChange(clipboardManager.getText()?.text.orEmpty()) },
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                onSearch = onQueryChange,
             )
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onPaste: () -> Unit,
-    modifier: Modifier = Modifier,
-    placeholder: String = "Song, album, playlist o URL",
-) {
-    SearchBar(
-        query = query,
-        onQueryChange = onQueryChange,
-        onSearch = { submitted -> if (submitted.isNotBlank()) onQueryChange(submitted) },
-        active = false,
-        onActiveChange = {},
-        modifier = modifier.fillMaxWidth(),
-        placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-        trailingIcon = {
-            IconButton(onClick = onPaste) {
-                Icon(Icons.Default.ContentPaste, contentDescription = "Pegar")
-            }
-        },
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = SearchBarDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {}
 }

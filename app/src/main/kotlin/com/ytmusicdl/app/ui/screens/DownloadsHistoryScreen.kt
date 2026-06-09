@@ -5,8 +5,13 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Environment
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,9 +30,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
@@ -197,6 +204,30 @@ private fun QueueItemCard(item: DownloadService.QueueItem) {
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
 
+            AnimatedVisibility(
+                visible = item.status == "done" || item.status == "completed",
+                enter = slideInHorizontally(initialOffsetX = { -it }) + expandVertically() + fadeIn(),
+                exit = fadeOut(),
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(Icons.Default.AudioFile, contentDescription = null)
+                        Icon(Icons.Default.ArrowForward, contentDescription = null)
+                        Icon(Icons.Default.Folder, contentDescription = null)
+                        Text("Archivo movido visualmente a Library", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = {}, label = { Text("ETA ${if (item.etaSec >= 0) "${item.etaSec}s" else "--"}") }, leadingIcon = { Icon(Icons.Default.HourglassTop, null) })
                 AssistChip(onClick = {}, label = { Text("${"%.2f".format(item.speedMbps)} MB/s") }, leadingIcon = { Icon(Icons.Default.Speed, null) })
@@ -313,22 +344,22 @@ private fun mimeTypeFor(file: File): String = when (file.extension.lowercase(Loc
 private fun statusLabel(status: String): String = when (status.lowercase(Locale.ROOT)) {
     "downloading" -> "Descargando: recibiendo datos y actualizando progreso"
     "queued" -> "En espera: listo para iniciar cuando haya un slot libre"
-    "completed" -> "Completada: archivo guardado en la biblioteca"
-    "failed" -> "Fallida: revisa el detalle del backend"
+    "done", "completed" -> "Completada: archivo guardado en la biblioteca"
+    "error", "failed" -> "Fallida: revisa el detalle del backend"
     else -> status.ifBlank { "Procesando" }
 }
 
 private fun statusIcon(status: String) = when (status.lowercase(Locale.ROOT)) {
-    "completed" -> Icons.Default.CheckCircle
-    "failed" -> Icons.Default.Error
+    "done", "completed" -> Icons.Default.CheckCircle
+    "error", "failed" -> Icons.Default.Error
     "downloading" -> Icons.Default.Speed
     else -> Icons.Default.HourglassTop
 }
 
 @Composable
 private fun statusColor(status: String) = when (status.lowercase(Locale.ROOT)) {
-    "completed" -> MaterialTheme.colorScheme.primary
-    "failed" -> MaterialTheme.colorScheme.error
+    "done", "completed" -> MaterialTheme.colorScheme.primary
+    "error", "failed" -> MaterialTheme.colorScheme.error
     "downloading" -> MaterialTheme.colorScheme.tertiary
     else -> MaterialTheme.colorScheme.secondary
 }

@@ -61,19 +61,19 @@ fun App(pythonError: String? = null) {
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
     var detailMode by remember { mutableStateOf(DetailMode.SONG) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
-    var seedQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
 
     BackHandler(enabled = selectedTrack != null || tab != AppTab.HOME) {
         when {
             selectedTrack != null -> selectedTrack = null
-            tab != AppTab.HOME -> tab = AppTab.HOME
+            tab != AppTab.HOME -> { searchQuery = ""; tab = AppTab.HOME }
         }
     }
 
     Scaffold(bottomBar = {
         if (selectedTrack == null) {
             NavigationBar {
-                NavigationBarItem(selected = tab == AppTab.HOME, onClick = { tab = AppTab.HOME }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
+                NavigationBarItem(selected = tab == AppTab.HOME, onClick = { searchQuery = ""; tab = AppTab.HOME }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
                 NavigationBarItem(selected = tab == AppTab.SEARCH, onClick = { tab = AppTab.SEARCH }, icon = { Icon(Icons.Default.Search, null) }, label = { Text("Search") })
                 NavigationBarItem(selected = tab == AppTab.QUEUE, onClick = { tab = AppTab.QUEUE }, icon = { Icon(Icons.Default.Download, null) }, label = { Text("Queue") })
                 NavigationBarItem(selected = tab == AppTab.LIBRARY, onClick = { tab = AppTab.LIBRARY }, icon = { Icon(Icons.Default.Folder, null) }, label = { Text("Library") })
@@ -90,13 +90,16 @@ fun App(pythonError: String? = null) {
                 } else {
                     when (currentTab) {
                         AppTab.HOME -> HomeScreen(
-                            onQuickSearch = { seedQuery = it; tab = AppTab.SEARCH },
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onQuickSearch = { searchQuery = it; tab = AppTab.SEARCH },
                         )
                         AppTab.SEARCH -> SearchScreen(
                             onOpenSong = { detailMode = DetailMode.SONG; selectedTrack = it },
                             onOpenAlbum = { detailMode = DetailMode.ALBUM; selectedTrack = it },
-                            onBack = { tab = AppTab.HOME },
-                            initialQuery = seedQuery,
+                            onBack = { searchQuery = ""; tab = AppTab.HOME },
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
                             onGlobalBackendError = { globalBackendError = it },
                         )
                         AppTab.QUEUE -> DownloadsHistoryScreen(onBack = { tab = AppTab.HOME }, showQueueOnly = true)
@@ -115,10 +118,6 @@ fun App(pythonError: String? = null) {
         AlertDialog(onDismissRequest = { showPythonError = false }, confirmButton = { TextButton(onClick = { showPythonError = false }) { Text("OK") } }, title = { Text("Motor de extracción no disponible") }, text = { Text("$pythonError") })
     }
 
-    LaunchedEffect(seedQuery, tab) {
-        if (tab != AppTab.SEARCH) return@LaunchedEffect
-        if (seedQuery.isNotBlank()) seedQuery = ""
-    }
 }
 
 @Composable
