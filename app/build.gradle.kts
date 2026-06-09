@@ -36,7 +36,7 @@ android {
     buildFeatures { compose = true }
 
     // Filtrar arquitecturas que no necesitamos (reduce tamaño APK)
-    // ffmpeg-kit incluye binarios nativos para 4 ABIs
+    // FFmpegKit aporta librerías nativas embebidas, sin requerir binario externo de ffmpeg
     packaging {
         jniLibs {
             // Excluir duplicados de dependencias nativas
@@ -124,6 +124,9 @@ dependencies {
     // ExoPlayer — reproducción de preview
     implementation(libs.media3.exoplayer)
 
+
+    // FFmpegKit — conversión de audio embebida vía API Android, sin depender de un ejecutable externo
+    implementation("com.antonkarpenko:ffmpeg-kit-audio:2.1.0")
 
     // JAudioTagger — escritura de tags ID3/MP4 en Kotlin/Java puro
     implementation("net.jthink:jaudiotagger:3.0.1")

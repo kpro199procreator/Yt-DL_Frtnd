@@ -76,7 +76,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
-private val supportedAudioExtensions = setOf("mp3", "m4a", "wav", "webm")
+private val supportedAudioExtensions = setOf("mp3", "wav", "flac")
 
 private data class DownloadHistoryItem(
     val filePath: String,
@@ -261,7 +261,7 @@ private fun QueueItemCard(item: DownloadService.QueueItem) {
 private fun LibraryContent(items: List<DownloadHistoryItem>, onOpenFile: (DownloadHistoryItem) -> Unit) {
     Text(stringResource(R.string.offline_files), style = MaterialTheme.typography.titleMedium)
     Text(
-        "Solo audio: .mp3, .m4a, .wav y .webm",
+        "Solo audio: .mp3, .wav y .flac",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -340,9 +340,8 @@ private fun formatDuration(durationMs: Long, noDuration: String): String {
 
 private fun mimeTypeFor(file: File): String = when (file.extension.lowercase(Locale.ROOT)) {
     "mp3" -> "audio/mpeg"
-    "m4a" -> "audio/mp4"
     "wav" -> "audio/wav"
-    "webm" -> "audio/webm"
+    "flac" -> "audio/flac"
     else -> "audio/*"
 }
 
