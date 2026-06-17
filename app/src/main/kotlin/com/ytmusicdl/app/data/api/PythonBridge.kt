@@ -42,7 +42,7 @@ object PythonBridge {
     }
 
     fun parseTrackList(json: String): List<com.ytmusicdl.app.data.model.Track> {
-        val array = JSONArray(json)
+        val array = jsonArrayOrEmpty(json)
         return buildList {
             for (i in 0 until array.length()) {
                 add(parseTrack(array.getJSONObject(i)))
@@ -52,7 +52,9 @@ object PythonBridge {
 
     fun parseTrack(json: String): com.ytmusicdl.app.data.model.Track? {
         if (json.isBlank() || json == "null") return null
-        return parseTrack(JSONObject(json))
+        val obj = jsonObjectOrEmpty(json)
+        if (obj.length() == 0) return null
+        return parseTrack(obj)
     }
 
     fun parseAudioResult(json: String): AudioExtractionResult? {
@@ -102,7 +104,7 @@ object PythonBridge {
 
     fun parseSearchBundle(json: String): SearchBundle {
         if (json.isBlank() || json == "null") return SearchBundle(emptyList(), emptyList(), emptyList())
-        val obj = JSONObject(json)
+        val obj = jsonObjectOrEmpty(json)
         fun arrToTracks(name: String): List<com.ytmusicdl.app.data.model.Track> {
             val arr = obj.optJSONArray(name) ?: JSONArray()
             return buildList {
@@ -126,7 +128,7 @@ object PythonBridge {
                 tracks = emptyList(),
             )
         }
-        val obj = JSONObject(json)
+        val obj = jsonObjectOrEmpty(json)
         val playlistObj = obj.optJSONObject("playlist") ?: JSONObject()
         val tracksArr = obj.optJSONArray("tracks") ?: JSONArray()
         val seen = HashSet<String>()
@@ -153,7 +155,7 @@ object PythonBridge {
         if (json.isBlank() || json == "null") {
             return AlbumTracksResult(AlbumMeta("", "", "", 0), emptyList(), false)
         }
-        val obj = JSONObject(json)
+        val obj = jsonObjectOrEmpty(json)
         val albumObj = obj.optJSONObject("album") ?: JSONObject()
         val tracksArr = obj.optJSONArray("tracks") ?: JSONArray()
         val seen = HashSet<String>()
@@ -175,6 +177,18 @@ object PythonBridge {
             tracks = tracks,
             exactMatch = obj.optBoolean("exactMatch", false),
         )
+    }
+
+    private fun jsonArrayOrEmpty(json: String): JSONArray = try {
+        if (json.isBlank() || json == "null") JSONArray() else JSONArray(json)
+    } catch (_: Exception) {
+        JSONArray()
+    }
+
+    private fun jsonObjectOrEmpty(json: String): JSONObject = try {
+        if (json.isBlank() || json == "null") JSONObject() else JSONObject(json)
+    } catch (_: Exception) {
+        JSONObject()
     }
 
     private fun parseTrack(obj: JSONObject) = com.ytmusicdl.app.data.model.Track(

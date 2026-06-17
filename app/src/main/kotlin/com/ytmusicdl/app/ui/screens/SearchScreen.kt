@@ -64,11 +64,10 @@ fun SearchScreen(
             loading = true
             error = null
             try {
-                val bundle = ExtractorBackendProvider.backend.searchAll(q, 20)
                 results = when (mode) {
-                    SearchMode.SONGS -> bundle.songs
-                    SearchMode.ALBUMS -> bundle.albums
-                    SearchMode.PLAYLISTS -> bundle.playlists
+                    SearchMode.SONGS -> ExtractorBackendProvider.backend.searchSongs(q, 20)
+                    SearchMode.ALBUMS -> ExtractorBackendProvider.backend.searchAlbums(q, 12)
+                    SearchMode.PLAYLISTS -> ExtractorBackendProvider.backend.searchPlaylists(q, 12)
                 }
                 if (results.isEmpty()) error = noResultsFor.replace(query, q)
             } catch (e: Exception) {
@@ -122,7 +121,7 @@ fun SearchScreen(
                                     if (track.coverUrl.isBlank()) Icon(Icons.Default.MusicNote, contentDescription = null)
                                     else AsyncImage(model = track.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(72.dp).clip(MaterialTheme.shapes.medium))
                                 },
-                                trailingContent = { IconButton(onClick = { onOpenSong(track) }) { Icon(Icons.Default.Download, null) } },
+                                trailingContent = { IconButton(onClick = { if (mode == SearchMode.SONGS) onOpenSong(track) else onOpenAlbum(track) }) { Icon(Icons.Default.Download, null) } },
                             )
                         }
                     }

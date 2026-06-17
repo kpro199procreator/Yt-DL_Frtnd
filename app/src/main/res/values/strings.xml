@@ -4,6 +4,7 @@
     <string name="nav_search">Search</string>
     <string name="nav_queue">Queue</string>
     <string name="nav_library">Library</string>
+    <string name="nav_settings">Ajustes</string>
     <string name="close">Cerrar</string>
     <string name="ok">OK</string>
     <string name="python_error_title">Motor de extracción no disponible</string>
@@ -80,7 +81,7 @@
     <string name="format_auto">auto</string>
     <string name="unknown_year">----</string>
     <string name="offline_files">Archivos offline</string>
-    <string name="audio_only_extensions">Solo audio: .mp3, .m4a, .wav y .webm</string>
+    <string name="audio_only_extensions">Solo audio: .mp3, .wav y .flac</string>
     <string name="empty_audio_library">Biblioteca vacía: aún no hay archivos de audio descargados</string>
     <string name="open">Abrir</string>
     <string name="cover_art">Carátula</string>

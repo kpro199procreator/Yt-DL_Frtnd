@@ -9,7 +9,7 @@
 -dontwarn org.jaudiotagger.**
 
 # ffmpeg-kit
--keep class com.arthenica.ffmpegkit.** { *; }
+-keep class com.antonkarpenko.ffmpegkit.** { *; }
 
 # OkHttp
 -dontwarn okhttp3.**

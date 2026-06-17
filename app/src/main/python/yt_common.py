@@ -44,18 +44,74 @@ def track_from_search_item(item: dict) -> dict:
     }
 
 
+
+def _run_search(query, filter_name, limit):
+    try:
+        return _ytmusic.search(query, filter=filter_name, limit=int(limit or 8)) or []
+    except Exception as exc:
+        return [{"_error": str(exc)}]
+
+def album_from_search_item(item: dict) -> dict:
+    artists = item.get("artists") or []
+    artist_name = artists[0].get("name", "") if artists else ""
+    thumbs = item.get("thumbnails") or []
+    return {
+        "videoId": item.get("browseId", ""),
+        "title": item.get("title", ""),
+        "artist": artist_name,
+        "album": item.get("title", ""),
+        "year": str(item.get("year", "") or ""),
+        "coverUrl": _best_thumbnail_url(thumbs),
+        "duration": item.get("type", "Album"),
+        "streamUrl": "",
+        "trackNumber": 0,
+    }
+
+def playlist_from_search_item(item: dict) -> dict:
+    thumbs = item.get("thumbnails") or []
+    playlist_id = item.get("playlistId") or item.get("browseId") or item.get("videoId") or ""
+    author = item.get("author") or item.get("itemCount") or ""
+    return {
+        "videoId": playlist_id,
+        "title": item.get("title", ""),
+        "artist": str(author or ""),
+        "album": "Playlist",
+        "year": "",
+        "coverUrl": _best_thumbnail_url(thumbs),
+        "duration": item.get("itemCount", ""),
+        "streamUrl": "",
+        "trackNumber": 0,
+    }
+
+def _first_error(items):
+    err = next((x.get("_error") for x in items if isinstance(x, dict) and x.get("_error")), "")
+    return err or ""
+
 def search_tracks(query, limit=8):
-    results = _ytmusic.search(query, filter="songs", limit=int(limit or 8))
+    results = _run_search(query, "songs", limit)
     tracks = [track_from_search_item(x) for x in results if x.get("videoId")]
     return json.dumps(tracks)
 
+def search_albums(query, limit=8):
+    results = _run_search(query, "albums", limit)
+    albums = [album_from_search_item(x) for x in results if x.get("browseId")]
+    return json.dumps(albums)
+
+def search_playlists(query, limit=8):
+    results = _run_search(query, "playlists", limit)
+    playlists = [playlist_from_search_item(x) for x in results if (x.get("playlistId") or x.get("browseId") or x.get("videoId"))]
+    return json.dumps(playlists)
 
 def search_all(query, limit=24):
     lim = int(limit or 24)
-    songs = [track_from_search_item(x) for x in _ytmusic.search(query, filter="songs", limit=lim) if x.get("videoId")]
-    albums = [track_from_search_item(x) for x in _ytmusic.search(query, filter="albums", limit=max(8, lim // 2)) if x.get("videoId")]
-    playlists = [track_from_search_item(x) for x in _ytmusic.search(query, filter="playlists", limit=max(8, lim // 2)) if x.get("videoId")]
-    return json.dumps({"songs": songs, "albums": albums, "playlists": playlists})
+    song_items = _run_search(query, "songs", lim)
+    album_items = _run_search(query, "albums", max(8, lim // 2))
+    playlist_items = _run_search(query, "playlists", max(8, lim // 2))
+    songs = [track_from_search_item(x) for x in song_items if x.get("videoId")]
+    albums = [album_from_search_item(x) for x in album_items if x.get("browseId")]
+    playlists = [playlist_from_search_item(x) for x in playlist_items if (x.get("playlistId") or x.get("browseId") or x.get("videoId"))]
+    errors = [e for e in (_first_error(song_items), _first_error(album_items), _first_error(playlist_items)) if e]
+    return json.dumps({"songs": songs, "albums": albums, "playlists": playlists, "errors": errors})
 
 
 def get_music_metadata(video_id_or_query):

@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.*
 import androidx.core.app.NotificationCompat
+import com.antonkarpenko.ffmpegkit.FFmpegKit
+import com.antonkarpenko.ffmpegkit.ReturnCode
 import com.ytmusicdl.app.data.SettingsPrefs
 import com.ytmusicdl.app.data.api.LrcLibService
 import com.ytmusicdl.app.data.api.ExtractorBackendProvider
@@ -27,7 +29,7 @@ import kotlinx.coroutines.sync.withPermit
  * Flujo:
  *   1. El backend extrae la URL de audio del video
  *   2. OkHttp descarga el stream de audio (m4a/webm)
- *   3. Mantiene contenedor de origen (sin conversión FFmpeg)
+ *   3. Convierte con FFmpegKit al formato final elegido (MP3/WAV/FLAC)
  *   4. JAudioTagger escribe los tags (título, artista, carátula, letras LRC)
  *   5. Guarda en ~/Music en almacenamiento externo
  */
@@ -117,6 +119,7 @@ class DownloadService : Service() {
             downloadState.value = DownloadState.FetchingStream
             updateNotification(notifId, "Obteniendo stream…", 0)
 
+            val targetFormat = SettingsPrefs.outputFormat(applicationContext)
             val extraction = ExtractorBackendProvider.backend.extractAudio(track.videoId)
                 ?: run {
                     downloadState.value = DownloadState.Error("No se pudo extraer el stream")
@@ -124,7 +127,7 @@ class DownloadService : Service() {
                 }
 
             val audioUrl = extraction.audioUrl
-            val ext = extraction.containerExt
+            val ext = extraction.containerExt.ifBlank { "m4a" }
             if (audioUrl.isBlank()) {
                 downloadState.value = DownloadState.Error("No se encontró URL de audio (${extraction.selectionReason})")
                 stopSelf(); return
@@ -158,8 +161,18 @@ class DownloadService : Service() {
                 updateNotification(notifId, "Descargando $qualityLabel", progress)
             }
 
-            // 3. Sin conversión FFmpeg: se conserva el archivo descargado
-            val finalFile = tempFile
+            // 3. Convertir si el formato final lo requiere.
+            val finalExt = targetFormat.takeIf { it.isNotBlank() } ?: ext
+            val finalFile = if (finalExt.equals(ext, ignoreCase = true)) {
+                tempFile
+            } else {
+                val converted = File(cacheDir, "${track.videoId}_converted.$finalExt")
+                queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(status = "processing", format = finalExt, cliOutput = "[ffmpeg] convirtiendo $ext → $finalExt", etaSec = 0) else it } }
+                downloadState.value = DownloadState.Converting
+                updateNotification(notifId, "Convirtiendo a ${finalExt.uppercase()}…", 100)
+                convertWithFfmpeg(tempFile, converted, finalExt)
+                converted
+            }
 
             // 4. Escribir tags
             queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(cliOutput = "[postprocess] escribiendo tags", etaSec = 0) else it } }
@@ -170,11 +183,11 @@ class DownloadService : Service() {
             // 5. Mover a carpeta de música
             val configuredPath = SettingsPrefs.downloadPath(applicationContext).trim().ifBlank { "/Music/ytmusicdl" }
             val outputDir = File(android.os.Environment.getExternalStorageDirectory(), configuredPath.removePrefix("/")).also { it.mkdirs() }
-            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".${ext.ifBlank { "m4a" }}"
+            val outputName = applyTemplate(SettingsPrefs.filenameTemplate(applicationContext), enrichedTrack) + ".$finalExt"
             val outputFile = File(outputDir, sanitize(outputName))
             finalFile.copyTo(outputFile, overwrite = true)
             tempFile.delete()
-            finalFile.delete()
+            if (finalFile.absolutePath != tempFile.absolutePath) finalFile.delete()
 
             // Notificar al sistema de medios
             android.media.MediaScannerConnection.scanFile(
@@ -182,7 +195,7 @@ class DownloadService : Service() {
             )
 
             downloadState.value = DownloadState.Done(outputFile.absolutePath)
-            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = 100, status = "done", speedMbps = 0f, etaSec = 0, cliOutput = "[done] guardado en ${outputFile.name}") else it } }
+            queueState.update { list -> list.map { if (it.videoId == track.videoId) it.copy(progress = 100, status = "done", format = finalExt, speedMbps = 0f, etaSec = 0, cliOutput = "[done] guardado en ${outputFile.name}") else it } }
             updateNotification(notifId, "✓ ${enrichedTrack.title} descargado ($qualityLabel)", 100)
 
         } catch (e: Exception) {
@@ -194,6 +207,23 @@ class DownloadService : Service() {
             val pending = queueState.value.any { it.status == "queued" || it.status == "downloading" }
             if (!pending) stopSelf()
         }
+        }
+    }
+
+
+    private suspend fun convertWithFfmpeg(input: File, output: File, targetFormat: String) = withContext(Dispatchers.IO) {
+        val args = when (targetFormat.lowercase()) {
+            "mp3" -> arrayOf("-y", "-i", input.absolutePath, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", output.absolutePath)
+            "wav" -> arrayOf("-y", "-i", input.absolutePath, "-vn", "-c:a", "pcm_s16le", output.absolutePath)
+            "flac" -> arrayOf("-y", "-i", input.absolutePath, "-vn", "-c:a", "flac", output.absolutePath)
+            else -> throw IllegalArgumentException("Formato de salida no soportado: $targetFormat")
+        }
+        val session = FFmpegKit.executeWithArguments(args)
+        val returnCode = session.returnCode
+        if (!ReturnCode.isSuccess(returnCode) || !output.exists() || output.length() == 0L) {
+            output.delete()
+            val log = session.allLogsAsString?.takeLast(1200).orEmpty()
+            throw IllegalStateException("FFmpegKit falló (${returnCode?.value ?: "sin código"}): ${log.ifBlank { "sin salida" }}")
         }
     }
 

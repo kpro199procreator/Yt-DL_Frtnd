@@ -10,6 +10,16 @@ object EmbeddedPythonBackend : ExtractorBackend {
         PythonBridge.parseTrackList(json)
     }
 
+    override suspend fun searchAlbums(query: String, limit: Int): List<Track> = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("search_albums", query, limit)
+        PythonBridge.parseTrackList(json)
+    }
+
+    override suspend fun searchPlaylists(query: String, limit: Int): List<Track> = withContext(Dispatchers.IO) {
+        val json = PythonBridge.call("search_playlists", query, limit)
+        PythonBridge.parseTrackList(json)
+    }
+
     override suspend fun searchAll(query: String, limit: Int): SearchBundle = withContext(Dispatchers.IO) {
         val json = PythonBridge.call("search_all", query, limit)
         PythonBridge.parseSearchBundle(json)

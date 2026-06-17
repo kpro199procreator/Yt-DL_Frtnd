@@ -1,7 +1,7 @@
 import json
 from yt_dlp import YoutubeDL
 
-from yt_common import search_tracks, search_all, get_music_metadata, get_lyrics, upgrade_thumbnail_url
+from yt_common import search_tracks, search_albums, search_playlists, search_all, get_music_metadata, get_lyrics, upgrade_thumbnail_url
 from yt_albums import get_album_tracks
 from yt_playlists import get_playlist_tracks
 from yt_tops import get_top_world, get_top_region

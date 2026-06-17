@@ -21,6 +21,8 @@ data class SearchBundle(
 
 interface ExtractorBackend {
     suspend fun searchSongs(query: String, limit: Int = 8): List<Track>
+    suspend fun searchAlbums(query: String, limit: Int = 8): List<Track>
+    suspend fun searchPlaylists(query: String, limit: Int = 8): List<Track>
     suspend fun searchAll(query: String, limit: Int = 24): SearchBundle
     suspend fun listAudioFormats(videoId: String): List<AudioFormatOption>
     suspend fun extractAudio(videoId: String, preferredFormatId: String? = null): AudioExtractionResult?
